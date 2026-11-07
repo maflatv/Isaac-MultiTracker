@@ -2,5 +2,9 @@
 /userdata/
 /multitracker.config.json
 
+# Archivos generados al compilar
+/.build/
+/dist/
+
 # Fuente opcional: cada usuario la añade por su cuenta (consulta el README)
 /app/upheaval.ttf

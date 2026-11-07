@@ -1,13 +1,14 @@
 // Tracker unificado: partida actual (log.txt) y progreso hacia Dead God (guardado). Solo lee archivos del juego.
 const fs = require('fs');
 const path = require('path');
-const { safeJoin, send, serveFile, readBody, writeFile, readJson } = require('./lib/http.js');
+const { safeJoin, send, serveFile, serveAsset, readBody, writeFile, readJson } = require('./lib/http.js');
+const { BASE_DIR } = require('./lib/runtime.js');
 const { pickFile } = require('./lib/filepicker.js');
 const { RunLog } = require('./lib/log.js');
 const { parseSave, summarize, listSaves, COUNTER_GOALS, WATCHED_ACHIEVEMENTS } = require('./lib/save.js');
 const { loadGameData, floorLabel, CHARACTERS, TRANSFORMS, TRANSFORM_GOAL } = require('./lib/gamedata.js');
 
-const APP_DIR = path.join(__dirname, 'app');
+const APP_DIR = path.join(BASE_DIR, 'app');
 const LOG_POLL_MS = 1000;
 
 const CUSTOM_SAVE = 'custom';
@@ -208,7 +209,7 @@ function createTracker({ resDir, gameDir, steamUserdata, dataDir }) {
     if (req.method === 'GET' && (m = /^\/icon\/item\/(\d+)\.png$/.exec(pathname))) return serveIcon(res, gameData().icons.get(+m[1]));
     if (req.method === 'GET') {
       const f = safeJoin(APP_DIR, pathname === '/' ? 'index.html' : pathname.slice(1));
-      return f ? serveFile(res, f) : send(res, 400, { error: 'Ruta inválida' });
+      return f ? serveAsset(res, path.relative(BASE_DIR, f).split(path.sep).join('/')) : send(res, 400, { error: 'Ruta inválida' });
     }
     send(res, 405, { error: 'Método no permitido' });
   }

@@ -8,22 +8,30 @@ Solo lee archivos del juego: no modifica tus partidas ni necesita mods.
 
 ## Requisitos
 
-- Windows
-- [Node.js](https://nodejs.org) (no hay que instalar dependencias)
+- Windows de 64 bits
 - The Binding of Isaac: Repentance+ en Steam
 
 ## Instalación
 
-1. Descarga o clona este repositorio.
-2. Ejecuta una vez `tools\ResourceExtractor\ResourceExtractor.exe`, en la carpeta del juego en Steam. MultiTracker toma de ahí los iconos y los nombres, porque este repositorio no incluye ningún archivo del juego.
-3. Ejecuta `iniciar.bat`. Se abrirá el panel en http://localhost:7374.
+1. Descarga el `.zip` de la [última versión](https://github.com/maflatv/MultiTracker/releases/latest) y descomprímelo en su propia carpeta. Tus ajustes se guardarán ahí.
+2. Ejecuta una vez `tools\ResourceExtractor\ResourceExtractor.exe`, en la carpeta del juego en Steam. MultiTracker toma de ahí los iconos y los nombres, porque no incluye ningún archivo del juego.
+3. Abre `MultiTracker.exe`. Se abrirá el panel en http://localhost:7374.
 4. Elige tu guardado en el panel.
+
+El ejecutable no tiene firma digital, así que Windows puede mostrar un aviso. Para continuar, pulsa **Más información** y luego **Ejecutar de todas formas**.
 
 ## Uso
 
 - **Configurar:** el panel permite elegir el guardado, qué se muestra y la apariencia. Los cambios se aplican al momento.
-- **Ventana aparte:** `ventana.bat` abre el tracker en una ventana de 900×121 con Microsoft Edge.
-- **OBS:** añade una fuente de navegador con la URL http://localhost:7374/overlay.html. `iniciar.bat` debe seguir abierto.
+- **Ventana aparte:** el botón **Abrir en ventana** del panel abre el tracker en una ventana de 900×121.
+- **OBS:** añade una fuente de navegador con la URL http://localhost:7374/overlay.html. Deja abierta la ventana de MultiTracker. Con `MultiTracker.exe --no-open`, el panel no se abre al iniciar.
+
+## Desde el código fuente
+
+Requiere [Node.js](https://nodejs.org) 24; no hay dependencias que instalar.
+
+- **Ejecutar:** `iniciar.bat` abre el panel, y `ventana.bat` abre el tracker en una ventana de 900×121 con Microsoft Edge.
+- **Generar el ejecutable:** `node build/build-exe.js 1.0.0` crea el `.exe` y el `.zip` en `dist/`. Solo incluye archivos versionados en Git.
 
 ## Qué muestra
 
@@ -45,13 +53,13 @@ MultiTracker busca sola las carpetas, incluidas otras bibliotecas de Steam. Si n
 | `gameDir` | La que contiene `log.txt`, en `Documents/My Games/Binding of Isaac Repentance+` |
 | `steamUserdata` | `userdata` de Steam, donde están los guardados |
 
-Tus ajustes se guardan en `userdata/` y no se suben a Git.
+El archivo debe estar junto a `MultiTracker.exe`. Tus ajustes se guardan en `userdata/`, también junto a él.
 
 ## Fuente Upheaval (opcional)
 
 El tracker está pensado para la fuente pixel Upheaval TT (BRK), que no se incluye porque no pudimos confirmar si su licencia permite redistribuirla. Sin ella, se usa la fuente del sistema.
 
-Para usarla, consíguela por tu cuenta y guárdala como `app/upheaval.ttf`.
+Para usarla, consíguela por tu cuenta y guárdala como `app/upheaval.ttf`, en la carpeta de `MultiTracker.exe`.
 
 ## Créditos
 
@@ -63,6 +71,7 @@ También puedes verlos en el panel, con el botón **Acerca de**.
 | [Rebirth Item Tracker](https://github.com/Hyphen-ated/RebirthItemTracker) | Brett824 y Hyphen-ated | Descripciones de los objetos (`data/items.json`) y códigos de los pisos. Licencia BSD de 2 cláusulas, en `data/LICENSE-RebirthItemTracker.txt` |
 | Isaac Deadgod Tracker | veryhighlibido | Inspiración para el seguimiento del progreso hacia Dead God |
 | [Fuente Upheaval](https://www.dafont.com/aenigma.d188) | Brian Kent (Ænigma Fonts) | Fuente opcional; no se incluye |
+| [Node.js](https://nodejs.org) | OpenJS Foundation y colaboradores de Node.js | Motor incluido en el ejecutable. Su licencia acompaña a cada versión publicada |
 | The Binding of Isaac: Repentance+ | Edmund McMillen y Nicalis | Iconos y nombres, leídos de tu propia copia del juego |
 
 Proyecto de fans, sin afiliación con los creadores del juego.
