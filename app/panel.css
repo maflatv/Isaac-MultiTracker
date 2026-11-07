@@ -37,3 +37,12 @@ h3 { font-size: 12px; margin: 12px 0 6px; color: var(--muted); }
 .slider input { width: 120px; padding: 0; accent-color: var(--accent2); }
 .slider output { width: 24px; text-align: right; color: var(--muted); }
 .note { overflow-wrap: anywhere; }
+dialog { width: min(480px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow: auto; padding: 16px; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; }
+dialog::backdrop { background: rgba(0, 0, 0, .6); }
+dialog h2 { font-size: 16px; }
+dialog p { margin: 0 0 8px; }
+dialog dl { margin: 0 0 10px; }
+dialog dt { margin-top: 10px; color: var(--muted); }
+dialog dd { margin: 2px 0 0; }
+dialog a { color: var(--accent2); }
+dialog form { display: flex; justify-content: flex-end; margin-top: 12px; }

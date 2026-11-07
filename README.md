@@ -55,5 +55,22 @@ Para usarla, consíguela por tu cuenta y guárdala como `app/upheaval.ttf`.
 
 ## Créditos
 
-- Las descripciones de `data/items.json` proceden de [Rebirth Item Tracker](https://github.com/Hyphen-ated/RebirthItemTracker), de Brett824 y Hyphen-ated. Su licencia está en `data/LICENSE-RebirthItemTracker.txt`.
-- The Binding of Isaac es propiedad de sus creadores. Este proyecto no está afiliado a ellos.
+También puedes verlos en el panel, con el botón **Acerca de**.
+
+| Componente | Autoría | Aportación |
+| --- | --- | --- |
+| MultiTracker | **Mafla** | Creador del proyecto |
+| [Rebirth Item Tracker](https://github.com/Hyphen-ated/RebirthItemTracker) | Brett824 y Hyphen-ated | Descripciones de los objetos (`data/items.json`) y códigos de los pisos. Licencia BSD de 2 cláusulas, en `data/LICENSE-RebirthItemTracker.txt` |
+| Isaac Deadgod Tracker | veryhighlibido | Inspiración para el seguimiento del progreso hacia Dead God |
+| [Fuente Upheaval](https://www.dafont.com/aenigma.d188) | Brian Kent (Ænigma Fonts) | Fuente opcional; no se incluye |
+| The Binding of Isaac: Repentance+ | Edmund McMillen y Nicalis | Iconos y nombres, leídos de tu propia copia del juego |
+
+Proyecto de fans, sin afiliación con los creadores del juego.
+
+## Licencia
+
+El código de MultiTracker se publica bajo la [licencia MIT](LICENSE). `data/items.json` conserva su propia licencia, en `data/LICENSE-RebirthItemTracker.txt`.
+
+## Apoya el proyecto
+
+MultiTracker es gratuito. Si te resulta útil y quieres apoyar a Mafla, puedes hacerlo en [Ko-fi](https://ko-fi.com/maflatv).

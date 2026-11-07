@@ -1,6 +1,7 @@
 // Panel de configuración: cada cambio se guarda al momento y la vista lo recoge en su siguiente lectura.
 // Fuera de la suite el panel está en la raíz: no hay hub al que volver.
 if (location.pathname === '/') document.querySelector('a.back').remove();
+document.getElementById('about').addEventListener('click', () => document.getElementById('aboutDialog').showModal());
 
 const STATUS_POLL_MS = 3000;
 const WINDOW_FEATURES = 'popup,width=900,height=121';

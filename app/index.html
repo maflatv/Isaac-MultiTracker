@@ -10,6 +10,7 @@
 <header>
   <h1><a class="back" href="/" title="Volver a Isaac Suite" aria-label="Volver a Isaac Suite">←</a>Tracker</h1>
   <div class="actions">
+    <button id="about">Acerca de</button>
     <button id="copyLink">Copiar enlace para OBS</button>
     <button id="openWindow" class="primary">Abrir en ventana</button>
   </div>
@@ -129,6 +130,27 @@
     <p class="note">Enlace para OBS (fuente de navegador, 900×121 en modo banner): <code id="link"></code></p>
   </section>
 </main>
+<dialog id="aboutDialog" aria-labelledby="aboutTitle">
+  <h2 id="aboutTitle">Acerca de MultiTracker</h2>
+  <p>Objetos de la partida y progreso hacia Dead God en una sola vista.</p>
+  <h3>Créditos</h3>
+  <dl>
+    <dt><a href="https://github.com/maflatv/MultiTracker" target="_blank" rel="noopener">MultiTracker</a></dt>
+    <dd><strong>Mafla</strong>. Creador del proyecto.</dd>
+    <dt><a href="https://github.com/Hyphen-ated/RebirthItemTracker" target="_blank" rel="noopener">Rebirth Item Tracker</a></dt>
+    <dd><strong>Brett824 y Hyphen-ated</strong>. Descripciones de los objetos y códigos de los pisos. Licencia BSD de 2 cláusulas.</dd>
+    <dt>Isaac Deadgod Tracker</dt>
+    <dd><strong>veryhighlibido</strong>. Inspiración para el seguimiento del progreso hacia Dead God.</dd>
+    <dt><a href="https://www.dafont.com/aenigma.d188" target="_blank" rel="noopener">Fuente Upheaval</a></dt>
+    <dd><strong>Brian Kent (Ænigma Fonts)</strong>. Fuente opcional; no se incluye con MultiTracker.</dd>
+    <dt>The Binding of Isaac: Repentance+</dt>
+    <dd><strong>Edmund McMillen y Nicalis</strong>. Iconos y nombres, leídos de tu propia copia del juego.</dd>
+  </dl>
+  <p class="note">Proyecto de fans, sin afiliación con los creadores del juego.</p>
+  <h3>Apoya el proyecto</h3>
+  <p>MultiTracker es gratuito. Si te resulta útil y quieres apoyar a Mafla, puedes hacerlo en <a href="https://ko-fi.com/maflatv" target="_blank" rel="noopener">Ko-fi</a>.</p>
+  <form method="dialog"><button class="primary">Cerrar</button></form>
+</dialog>
 <script src="panel.js"></script>
 </body>
 </html>
