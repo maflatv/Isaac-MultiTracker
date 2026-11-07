@@ -1,0 +1,6 @@
+# Datos y ajustes de cada usuario
+/userdata/
+/multitracker.config.json
+
+# Fuente opcional: cada usuario la añade por su cuenta (consulta el README)
+/app/upheaval.ttf

@@ -1,0 +1,416 @@
+// Vista del tracker: la misma página sirve para OBS, para una ventana y para la vista previa del panel.
+const POLL_MS = 1000;
+// Duración de la entrada del objeto, incluida en los segundos configurados. Coincide con overlay.css.
+const INTRO_MS = 900;
+const LEAVE_MS = 350;
+// Si hay más objetos esperando, cada uno se destaca menos tiempo.
+const QUEUED_SECONDS = 3;
+// Más objetos de golpe no son recogidas normales (Esau Jr., Genesis...): solo se destaca el último.
+const MAX_BATCH = 3;
+// Los objetos iniciales de una partida nueva pueden llegar en lecturas posteriores a la seed.
+const NEW_RUN_GRACE_MS = 2000;
+// Tiempo de cada página cuando el progreso no cabe en el lateral del banner.
+const PAGE_MS = 5000;
+// Antes de ocultar objetos se prueban iconos más pequeños.
+const OWNERS = { jacob: { name: 'Jacob', letter: 'J' }, esau: { name: 'Esaú', letter: 'E' } };
+const LABEL_ROOM = 6; // separación mínima entre el código de un piso y el del siguiente
+const FIT_ICON_SIZES = [32, 28, 24];
+// El banner usa el mayor tamaño que quepa, para aprovechar todo el espacio.
+const BANNER_ICON_SIZES = [96, 80, 64, 56, 48, 40, ...FIT_ICON_SIZES];
+
+const view = document.getElementById('view');
+const hero = document.getElementById('hero');
+let names = { goals: {}, watched: {} };
+let lastState = '';
+let current = null;
+const seen = { seed: null, count: 0, since: 0 };
+const queue = [];
+let heroActive = false;
+let sidePages = [];
+let sidePage = 0;
+
+function el(tag, className, text) {
+  const e = document.createElement(tag);
+  if (className) e.className = className;
+  if (text !== undefined) e.textContent = text;
+  return e;
+}
+
+function meter(label, done, total) {
+  const m = el('div', 'meter' + (done >= total ? ' done' : ''));
+  const head = el('div', 'meter-head');
+  head.append(el('span', '', label), el('b', '', `${done}/${total}`));
+  const track = el('div', 'meter-track'), fill = el('i');
+  fill.style.width = Math.min(100, (done / total) * 100) + '%';
+  track.append(fill);
+  m.append(head, track);
+  return m;
+}
+
+function tag(label, done) {
+  return el('span', 'tag' + (done ? ' done' : ''), label);
+}
+
+function pips(label, count, goal) {
+  const p = el('span', 'pips' + (count >= goal ? ' done' : ''), label + ' ');
+  for (let i = 0; i < goal; i++) p.append(el('i', i < count ? 'on' : ''));
+  return p;
+}
+
+// La racha es del guardado, no de la partida: se muestra también sin partida y en guardados al 100%.
+function streakTag(p) {
+  const tagEl = el('span', 'streak', 'Racha ');
+  tagEl.append(el('b', '', String(p.winStreak)));
+  tagEl.title = `Mejor racha: ${p.bestStreak}`;
+  return tagEl;
+}
+
+function whoBlock(s) {
+  const w = el('div', 'who'), { show } = s.config, r = s.run;
+  if (r && show.character && r.character) w.append(el('strong', '', r.character));
+  if (r && show.floor && r.floor) w.append(el('span', '', r.floor));
+  if (r && show.seed) w.append(el('code', '', r.seed));
+  if (show.winStreak && s.progress) w.append(streakTag(s.progress));
+  return w;
+}
+
+// Un guardado al 100% no tiene nada pendiente: no se muestra su progreso.
+function progressBlocks(s) {
+  const p = s.progress;
+  const meters = el('div', 'meters'), tags = el('div', 'tags');
+  if (!p || p.complete) return [meters, tags];
+  const { show, goals, watched, options } = s.config;
+  const add = (on, label, x) => { if (on && !(options.hideDone && x.done >= x.total)) meters.append(meter(label, x.done, x.total)); };
+  add(show.achievements, 'Logros', p.achievements);
+  add(show.collection, 'Objetos', p.items);
+  add(show.marksHard, 'Marcas difíciles', p.marksHard);
+  add(show.marksAny, 'Marcas', p.marksAny);
+  add(show.challenges, 'Retos', p.challenges);
+  for (const g of p.goals) {
+    if (!goals.includes(g.id) || (options.hideDone && g.done)) continue;
+    const name = names.goals[g.id] || g.id;
+    if (g.done) tags.append(tag(name, true));
+    else meters.append(meter(name, g.value, g.goal));
+  }
+  for (const w of p.watched) {
+    if (watched.includes(w.id) && !(options.hideDone && w.done)) tags.append(tag(names.watched[w.id] || w.id, w.done));
+  }
+  return [meters, tags];
+}
+
+function transformBlock(s) {
+  const row = el('div', 'tags');
+  if (!s.config.show.transforms || !s.run) return row;
+  const { hideDone, transformsClose } = s.config.options;
+  for (const t of s.run.transforms) {
+    const done = t.count >= t.goal;
+    if (hideDone && done) continue;
+    if (transformsClose && t.count < t.goal - 1) continue;
+    row.append(pips(t.name, t.count, t.goal));
+  }
+  return row;
+}
+
+function stripRow(s) {
+  const row = el('div', 'strip');
+  row.append(...[whoBlock(s), ...progressBlocks(s), transformBlock(s)].filter(b => b.childNodes.length));
+  return row;
+}
+
+function sideColumn(s) {
+  const side = el('div', 'side');
+  const who = whoBlock(s);
+  const [meters, tags] = progressBlocks(s);
+  const pages = el('div', 'pages');
+  pages.append(...meters.childNodes, ...[tags, transformBlock(s)].filter(b => b.childNodes.length));
+  side.append(...[who, pages].filter(b => b.childNodes.length));
+  return side;
+}
+
+// Reparte el progreso en páginas si no cabe a la vez: rotar es mejor que cortarlo o saturar el banner.
+function paginateSide(padding) {
+  sidePages = [];
+  const pages = view.querySelector('.pages');
+  if (!pages) return;
+  const who = view.querySelector('.side .who');
+  const room = window.innerHeight - padding * 2 - (who ? who.offsetHeight + 4 : 0);
+  splitTallBlocks(pages, room);
+  // Ancho fijo con todo visible: al rotar las páginas, los objetos no deben moverse.
+  const side = view.querySelector('.side');
+  side.style.width = side.offsetWidth + 'px';
+  let page = [], used = 0;
+  for (const unit of pages.children) {
+    const h = unit.offsetHeight + 4;
+    if (page.length && used + h > room) { sidePages.push(page); page = []; used = 0; }
+    page.push(unit);
+    used += h;
+  }
+  if (page.length) sidePages.push(page);
+  sidePage = sidePages.length ? sidePage % sidePages.length : 0;
+  showSidePage();
+}
+
+// Un bloque de etiquetas más alto que el espacio se reparte en varios, que ya caben en una página.
+function splitTallBlocks(pages, room) {
+  for (const block of [...pages.querySelectorAll(':scope > .tags')]) {
+    let current = block;
+    while (current.offsetHeight > room && current.children.length > 1) {
+      const rest = el('div', 'tags');
+      current.after(rest);
+      while (current.offsetHeight > room && current.children.length > 1) rest.prepend(current.lastElementChild);
+      current = rest;
+    }
+  }
+}
+
+function showSidePage() {
+  sidePages.forEach((page, i) => page.forEach(unit => { unit.hidden = i !== sidePage; }));
+}
+
+setInterval(() => {
+  if (sidePages.length < 2) return;
+  sidePage = (sidePage + 1) % sidePages.length;
+  showSidePage();
+}, PAGE_MS);
+
+function itemTile(i, latest) {
+  const t = el('div', 'item' + (i.removed ? ' removed' : '') + (i.blind ? ' blind' : '') + (latest ? ' latest' : ''));
+  t.title = `${i.name}${i.desc ? ' — ' + i.desc : ''}${i.floorLabel ? ' (' + i.floorLabel + ')' : ''}${i.blind ? ' — Maldición del ciego' : ''}`;
+  const img = el('img');
+  img.src = `icon/item/${i.id}.png`;
+  img.alt = i.name;
+  // Los objetos de mods no tienen icono en los recursos del juego: se muestra su nombre.
+  img.onerror = () => img.replaceWith(el('span', 'item-name', i.name));
+  t.append(img);
+  const owner = OWNERS[i.owner];
+  if (owner) {
+    t.title += ' — ' + owner.name;
+    t.append(el('span', 'owner-badge ' + i.owner, owner.letter));
+  }
+  return t;
+}
+
+function floorMark(i) {
+  const mark = el('span', 'floor-mark' + (i.blind ? ' blind' : ''));
+  mark.append(el('span', 'floor-label', i.floorLabel + (i.blind ? ' ?' : '')));
+  return mark;
+}
+
+// Los objetos del Esau del Alma no los ha tomado el personaje: se van con él al salir de la sala.
+function lastTaken(items) {
+  return [...items].reverse().find(i => !i.removed && !i.soul);
+}
+
+function shelfRow(s) {
+  const { options } = s.config, wrap = el('div', 'shelf' + (options.floorGroups ? ' floors' : ''));
+  let items = s.run.items;
+  const latest = lastTaken(items);
+  if (options.removed === 'hide') items = items.filter(i => !i.removed);
+  if (options.maxItems) items = items.slice(-options.maxItems);
+  let floor = null;
+  for (const i of items) {
+    const tile = itemTile(i, i === latest);
+    if (options.floorGroups) {
+      tile.dataset.floor = i.floor;
+      if (i.floor !== floor) tile.prepend(floorMark(i));
+    }
+    floor = i.floor;
+    wrap.append(tile);
+  }
+  return wrap;
+}
+
+// El código del piso no ocupa ancho propio: solo se aparta el piso siguiente si el código no cabe sobre sus objetos.
+function spaceFloorLabels(shelf) {
+  const tiles = [...shelf.querySelectorAll('.item[data-floor]')];
+  const pitch = () => tiles[0].offsetWidth + parseFloat(getComputedStyle(shelf).columnGap);
+  let count = 0;
+  tiles.forEach((tile, n) => {
+    tile.style.marginRight = '';
+    count++;
+    if (tiles[n + 1] && tiles[n + 1].dataset.floor === tile.dataset.floor) return;
+    const label = tiles[n - count + 1].querySelector('.floor-label');
+    tile.style.marginRight = Math.max(0, label.offsetWidth + LABEL_ROOM - count * pitch()) + 'px';
+    count = 0;
+  });
+}
+
+function descRow(s) {
+  const last = lastTaken(s.run.items);
+  const row = el('div', 'desc');
+  if (last) { row.append(el('strong', '', last.name)); if (last.desc) row.append(' — ' + last.desc); }
+  return row;
+}
+
+const OUTLINE = '-1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000';
+const TEXT_EFFECTS = { none: 'none', shadow: '0 1px 2px #000', outline: OUTLINE };
+const JUSTIFY = { left: 'flex-start', center: 'center', right: 'flex-end' };
+
+// Una fuente pixelada solo es nítida a ciertos tamaños: el texto secundario no se puede escalar con fracciones.
+const TEXT_SCALE = {
+  regular: { '--small': '.85em', '--large': '1.15em', '--label': '12px', '--floor-h': '14px', '--hero-title': 'clamp(1.3em, 14vh, 2.4em)', '--hero-desc': '1em' },
+  pixel: { '--small': '15px', '--large': '1em', '--label': '15px', '--floor-h': '14px', '--hero-title': '30px', '--hero-desc': '15px' },
+};
+const PIXEL_FONTS = ['Upheaval'];
+
+function applyStyle(o) {
+  const icon = { none: 'none', glow: `drop-shadow(0 0 3px ${o.accentColor})`, shadow: 'drop-shadow(1px 2px 1px #000)' };
+  const vars = {
+    ...TEXT_SCALE[PIXEL_FONTS.includes(o.font) ? 'pixel' : 'regular'],
+    '--font': `"${o.font}", system-ui, sans-serif`, '--size': o.fontSize + 'px', '--weight': o.bold ? 600 : 400,
+    '--text': o.textColor, '--accent': o.accentColor, '--done': o.doneColor, '--text-shadow': TEXT_EFFECTS[o.textEffect], '--blind': o.blindColor,
+    '--icon': o.iconSize + 'px', '--icon-gap': o.iconGap + 'px', '--icon-filter': icon[o.iconEffect],
+    '--row-gap': o.rowGap + 'px', '--padding': o.padding + 'px', '--radius': o.radius + 'px',
+    '--align': o.align, '--justify': JUSTIFY[o.align],
+    '--bg': o.background === 'solid' ? o.color : o.background === 'brick' ? 'url(ladrillo.png)' : 'transparent',
+    '--bg-opacity': o.backgroundOpacity / 100,
+  };
+  for (const [k, v] of Object.entries(vars)) document.documentElement.style.setProperty(k, v);
+}
+
+function render(s) {
+  const { show, options } = s.config;
+  applyStyle(options);
+  const banner = options.layout === 'banner';
+  view.className = banner ? 'banner' : 'wide';
+  const head = banner ? sideColumn(s) : stripRow(s);
+  const shelf = s.run && show.items ? [shelfRow(s)] : [];
+  const desc = s.run && show.description ? [descRow(s)] : [];
+  const parts = options.itemsPosition === 'above' ? [...shelf, head] : [head, ...shelf];
+  const body = parts.filter(p => p.childNodes.length);
+  if (banner) {
+    // La descripción va con los objetos para no quitarle anchura al lateral.
+    const main = el('div', 'main');
+    const shelfEl = body.find(p => p.classList.contains('shelf'));
+    if (shelfEl) { body[body.indexOf(shelfEl)] = main; main.append(shelfEl); }
+    else if (desc.length) body.push(main);
+    main.append(...desc.filter(p => p.childNodes.length));
+  } else body.push(...desc.filter(p => p.childNodes.length));
+  if (!s.run) body.push(el('div', 'waiting', 'Esperando partida…'));
+  view.replaceChildren(...body);
+  paginateSide(options.padding);
+  fitShelf(options);
+}
+
+// Elige el tamaño de los iconos y, si aun así no caben todos los objetos, conserva los más recientes
+// con un contador de los que no se ven. Unas filas elegidas a mano se respetan aunque no quepan en la ventana.
+function fitShelf({ padding, iconAuto, iconSize, layout, rows }) {
+  const shelf = view.querySelector('.shelf');
+  if (!shelf) return;
+  const room = window.innerHeight - padding * 2;
+  const rowCount = () => new Set([...shelf.children].map(c => c.offsetTop)).size;
+  const fits = () => view.offsetHeight <= room && (!rows || rowCount() <= rows);
+  let sizes = [iconSize];
+  if (iconAuto) sizes = layout === 'banner' ? BANNER_ICON_SIZES.filter(size => size <= room) : [iconSize, ...FIT_ICON_SIZES.filter(size => size < iconSize)];
+  for (const size of sizes) {
+    iconSize = size;
+    document.documentElement.style.setProperty('--icon', size + 'px');
+    spaceFloorLabels(shelf);
+    if (fits()) return;
+  }
+  // Si ni una fila cabe entera, se deja una: vaciar la estantería no arreglaría nada.
+  const tooMany = () => (rows ? rowCount() > rows : view.offsetHeight > room && rowCount() > 1);
+  if (!tooMany()) return;
+  const tiles = [...shelf.querySelectorAll('.item')];
+  const more = el('div', 'item more');
+  shelf.prepend(more);
+  let hidden = 0;
+  while (hidden < tiles.length - 1 && tooMany()) {
+    const tile = tiles[hidden++], mark = tile.querySelector('.floor-mark'), next = tile.nextElementSibling;
+    tile.remove();
+    // El separador pasa al siguiente objeto visible del piso; si no queda ninguno, desaparece con él.
+    if (mark && next.dataset.floor === tile.dataset.floor) next.prepend(mark);
+    spaceFloorLabels(shelf);
+    more.textContent = '+' + hidden;
+  }
+}
+
+// ---------- Objeto recién tomado ----------
+function detectPickups(s) {
+  if (!s.run) { seen.seed = null; seen.count = 0; return; }
+  const { seed, items } = s.run;
+  if (seed !== seen.seed) {
+    // Al abrir la vista o empezar otra partida no hay nada que destacar.
+    seen.seed = seed;
+    seen.since = Date.now();
+  } else if (items.length > seen.count && s.config.options.highlight && Date.now() - seen.since > NEW_RUN_GRACE_MS) {
+    const fresh = items.slice(seen.count).filter(i => !i.removed && !i.soul && !i.granted);
+    queue.push(...(fresh.length > MAX_BATCH ? fresh.slice(-1) : fresh));
+    playNext();
+  }
+  seen.count = items.length;
+}
+
+// seconds es el tiempo total en pantalla: incluye la entrada y la salida.
+function buildHero(item, seconds) {
+  const icon = el('div', 'hero-icon'), img = el('img');
+  img.src = `icon/item/${item.id}.png`;
+  img.alt = '';
+  img.onerror = () => img.remove();
+  icon.append(el('div', 'hero-rays'), img);
+  const text = el('div', 'hero-text');
+  text.append(el('small', '', item.floorLabel ? `Nuevo objeto · ${item.floorLabel}` : 'Nuevo objeto'));
+  if (OWNERS[item.owner]) text.firstChild.append(` · ${OWNERS[item.owner].name}`);
+  if (item.blind) text.firstChild.append(el('span', 'hero-blind', ' · Maldición del ciego'));
+  text.append(el('strong', '', item.name));
+  if (item.desc) text.append(el('p', '', item.desc));
+  const timer = el('div', 'hero-timer');
+  timer.style.animationDelay = INTRO_MS + 'ms';
+  timer.style.animationDuration = seconds * 1000 - INTRO_MS - LEAVE_MS + 'ms';
+  hero.replaceChildren(icon, text, timer);
+}
+
+function playNext() {
+  if (heroActive || !queue.length) return;
+  const item = queue.shift();
+  const configured = current ? current.config.options.highlightSeconds : 5;
+  const seconds = queue.length ? Math.min(QUEUED_SECONDS, configured) : configured;
+  heroActive = true;
+  buildHero(item, seconds);
+  hero.classList.remove('leaving');
+  hero.hidden = false;
+  document.body.classList.add('highlighting');
+  setTimeout(() => {
+    hero.classList.add('leaving');
+    setTimeout(() => {
+      hero.hidden = true;
+      heroActive = false;
+      if (queue.length) return playNext();
+      document.body.classList.remove('highlighting');
+      const tile = view.querySelector('.item.latest');
+      if (tile) tile.classList.add('fresh');
+    }, LEAVE_MS);
+  }, seconds * 1000 - LEAVE_MS);
+}
+
+// Para el botón de prueba del panel.
+function testHighlight() {
+  const items = current && current.run ? current.run.items.filter(i => !i.removed) : [];
+  const item = items[items.length - 1] || { id: 1, name: 'The Sad Onion', desc: 'Tears +0.7', floorLabel: '' };
+  queue.push(item);
+  playNext();
+}
+
+// También lo llama el panel, para que la vista previa responda sin esperar a la siguiente lectura.
+async function refresh() {
+  const text = await fetch('api/state').then(r => r.text());
+  if (text === lastState) return;
+  lastState = text;
+  current = JSON.parse(text);
+  render(current);
+  detectPickups(current);
+}
+
+async function tick() {
+  try { await refresh(); } catch { /* servidor parado: se conserva lo último y se reintenta */ }
+  setTimeout(tick, POLL_MS);
+}
+
+window.addEventListener('resize', () => { if (current) render(current); });
+
+fetch('api/choices').then(r => r.json()).then(c => {
+  names = {
+    goals: Object.fromEntries(c.goals.map(g => [g.id, g.name])),
+    watched: Object.fromEntries(c.watched.map(w => [w.id, w.name])),
+  };
+}).finally(tick);

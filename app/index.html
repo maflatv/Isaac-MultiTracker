@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>MultiTracker</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="panel.css">
+</head>
+<body>
+<header>
+  <h1><a class="back" href="/" title="Volver a Isaac Suite" aria-label="Volver a Isaac Suite">←</a>Tracker</h1>
+  <div class="actions">
+    <button id="copyLink">Copiar enlace para OBS</button>
+    <button id="openWindow" class="primary">Abrir en ventana</button>
+  </div>
+</header>
+<main>
+  <form id="form">
+    <section>
+      <h2>Archivo de guardado</h2>
+      <select id="saveId" aria-label="Guardado"></select>
+      <div id="customSave" class="path-row" hidden>
+        <input id="saveFile" aria-label="Ruta del archivo de guardado" placeholder="Ruta completa del archivo .dat" spellcheck="false">
+        <button type="button" id="browseSave">Examinar…</button>
+      </div>
+      <p class="note" id="saveStatus"></p>
+    </section>
+    <section>
+      <h2>Partida actual</h2>
+      <div id="showRun" class="checks"></div>
+      <p class="note" id="logStatus"></p>
+    </section>
+    <section>
+      <h2>Progreso general</h2>
+      <div id="showProgress" class="checks"></div>
+    </section>
+    <section>
+      <h2>Contadores</h2>
+      <div id="goals" class="checks"></div>
+    </section>
+    <section>
+      <h2>Logros vigilados</h2>
+      <div id="watched" class="checks"></div>
+    </section>
+    <section>
+      <h2>Qué mostrar de los objetos</h2>
+      <div class="fields">
+        <label>Máximo de objetos (0 = todos) <input type="number" data-option="maxItems" min="0" max="200"></label>
+        <label>Objetos perdidos
+          <select data-option="removed"><option value="dim">Atenuados</option><option value="hide">Ocultos</option></select>
+        </label>
+      </div>
+      <div class="checks">
+        <label><input type="checkbox" data-option="hideDone"> Ocultar lo ya completado</label>
+        <label><input type="checkbox" data-option="floorGroups"> Separar objetos por piso</label>
+        <label><input type="checkbox" data-option="transformsClose"> Solo transformaciones desde 2/3</label>
+      </div>
+    </section>
+    <section>
+      <h2>Objeto recién tomado</h2>
+      <div class="checks"><label><input type="checkbox" data-option="highlight"> Destacarlo con una animación</label></div>
+      <div class="fields">
+        <label>Duración de la animación (segundos) <span class="slider"><input type="range" data-option="highlightSeconds" min="2" max="20"><output></output></span></label>
+      </div>
+      <button type="button" id="testHighlight">Probar en la vista previa</button>
+    </section>
+    <section>
+      <h2>Apariencia</h2>
+      <div class="fields">
+        <label>Tema
+          <select id="theme" aria-label="Aplicar un tema"></select>
+        </label>
+      </div>
+      <h3>Texto</h3>
+      <div class="fields">
+        <label>Fuente <input data-option="font" list="fonts" maxlength="40" spellcheck="false"></label>
+        <datalist id="fonts">
+          <option value="Upheaval"><option value="Segoe UI"><option value="Arial"><option value="Bahnschrift"><option value="Consolas"><option value="Georgia"><option value="Impact"><option value="Trebuchet MS"><option value="Verdana"><option value="Comic Sans MS">
+        </datalist>
+        <label>Tamaño (Upheaval: 20 es el más nítido) <span class="slider"><input type="range" data-option="fontSize" min="10" max="32"><output></output></span></label>
+        <label>Efecto
+          <select data-option="textEffect"><option value="none">Ninguno</option><option value="shadow">Sombra</option><option value="outline">Contorno</option></select>
+        </label>
+        <label>Color del texto <input type="color" data-option="textColor"></label>
+        <label>Color de los valores <input type="color" data-option="accentColor"></label>
+        <label>Color de lo completado <input type="color" data-option="doneColor"></label>
+      </div>
+      <div class="checks"><label><input type="checkbox" data-option="bold"> Texto en negrita</label></div>
+      <h3>Iconos</h3>
+      <div class="fields">
+        <label>Tamaño automático <input type="checkbox" data-option="iconAuto"></label>
+        <label>Tamaño fijo <span class="slider"><input type="range" data-option="iconSize" min="16" max="96" step="4"><output></output></span></label>
+        <label>Filas de objetos (0 = automático) <span class="slider"><input type="range" data-option="rows" min="0" max="8"><output></output></span></label>
+        <label>Separación <span class="slider"><input type="range" data-option="iconGap" min="0" max="16"><output></output></span></label>
+        <label>Color de la maldición del ciego <input type="color" data-option="blindColor"></label>
+        <label>Efecto
+          <select data-option="iconEffect"><option value="none">Ninguno</option><option value="glow">Brillo</option><option value="shadow">Sombra</option></select>
+        </label>
+      </div>
+      <p class="note error" id="iconNote"></p>
+      <h3>Distribución</h3>
+      <div class="fields">
+        <label>Modo
+          <select data-option="layout"><option value="banner">Banner (900×121)</option><option value="wide">Amplio</option></select>
+        </label>
+        <label>Alineación
+          <select data-option="align"><option value="left">Izquierda</option><option value="center">Centro</option><option value="right">Derecha</option></select>
+        </label>
+        <label>Objetos
+          <select data-option="itemsPosition"><option value="below">Después del texto</option><option value="above">Antes del texto</option></select>
+        </label>
+        <label>Separación de filas <span class="slider"><input type="range" data-option="rowGap" min="0" max="24"><output></output></span></label>
+        <label>Margen interior <span class="slider"><input type="range" data-option="padding" min="0" max="32"><output></output></span></label>
+      </div>
+      <h3>Fondo</h3>
+      <div class="fields">
+        <label>Tipo
+          <select data-option="background"><option value="transparent">Transparente</option><option value="solid">Color</option><option value="brick">Ladrillo</option></select>
+        </label>
+        <label>Color <input type="color" data-option="color"></label>
+        <label>Opacidad <span class="slider"><input type="range" data-option="backgroundOpacity" min="0" max="100" step="5"><output></output></span></label>
+        <label>Esquinas redondeadas <span class="slider"><input type="range" data-option="radius" min="0" max="24"><output></output></span></label>
+      </div>
+    </section>
+  </form>
+  <section id="previewPane">
+    <h2>Vista previa</h2>
+    <iframe id="preview" src="overlay.html" title="Vista previa del tracker"></iframe>
+    <p class="note">Enlace para OBS (fuente de navegador, 900×121 en modo banner): <code id="link"></code></p>
+  </section>
+</main>
+<script src="panel.js"></script>
+</body>
+</html>
