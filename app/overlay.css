@@ -40,6 +40,15 @@ body.highlighting #view { opacity: 0; }
 .tag, .pips { display: inline-flex; align-items: center; gap: 3px; padding: 1px 8px; border: 1px solid rgba(255, 255, 255, .25); border-radius: 999px; font-size: var(--small); font-weight: 400; }
 .tag.done, .pips.done { border-color: var(--done); color: var(--done); }
 .tag.done::before { content: '✓ '; white-space: pre; }
+/* Logros como iconos (los de Steam), al estilo del Deadgod Tracker */
+.achs { display: flex; flex-wrap: wrap; align-items: center; justify-content: var(--justify); gap: 4px 8px; }
+.side .achs { justify-content: flex-start; }
+.side.icons { max-width: 260px; }
+.ach { position: relative; display: inline-flex; align-items: center; gap: 4px; font-size: var(--small); font-weight: 400; white-space: nowrap; }
+.ach img { display: block; width: var(--ach); height: var(--ach); border-radius: 3px; }
+.ach b { color: var(--accent); font-weight: 600; }
+.achs.gray .ach:not(.done) img { filter: grayscale(1) brightness(.75); }
+.ach.done::after { content: '✓'; position: absolute; left: calc(var(--ach) - 11px); top: calc(var(--ach) - 14px); color: var(--done); font: 700 14px/1 system-ui, sans-serif; text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000; }
 .pips i { width: 7px; height: 7px; border-radius: 50%; background: rgba(255, 255, 255, .25); }
 .pips i.on { background: var(--accent); }
 .pips.done i.on { background: var(--done); }

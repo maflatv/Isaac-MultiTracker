@@ -9,20 +9,25 @@ const CUSTOM_SAVE = 'custom';
 const BANNER_HEIGHT = 121;
 const MIN_AUTO_ICON = 24;
 const FLOOR_LABEL_HEIGHT = 14;
-const RUN_SHOW = { character: 'Personaje', seed: 'Seed', floor: 'Piso', items: 'Objetos', description: 'Descripción del último objeto', transforms: 'Transformaciones' };
-const PROGRESS_SHOW = { winStreak: 'Racha (Win Streak)', achievements: 'Logros', collection: 'Objetos de la colección', marksHard: 'Marcas en difícil', marksAny: 'Marcas (cualquiera)', challenges: 'Retos' };
+const KOFI = 'https://ko-fi.com/maflatv';
+const RUN_SHOW = ['character', 'seed', 'floor', 'items', 'description', 'transforms'];
+const PROGRESS_SHOW = ['winStreak', 'achievements', 'collection', 'marksHard', 'marksAny', 'challenges'];
 // Cada tema parte de la apariencia por defecto y cambia solo lo indicado.
 const THEMES = {
-  'Por defecto': {},
-  'Stream legible': { fontSize: 16, textEffect: 'outline', textColor: '#ffffff', accentColor: '#ffd84d', doneColor: '#7dff7d', iconEffect: 'shadow' },
-  'Minimalista': { fontSize: 12, bold: false, textEffect: 'none', iconGap: 0, rowGap: 2, padding: 4 },
-  'Mazmorra': { font: 'Georgia', accentColor: '#e0655f', doneColor: '#f0ad4e', iconEffect: 'shadow', background: 'brick', padding: 10 },
-  'Alto contraste': { textEffect: 'none', textColor: '#ffffff', accentColor: '#ffe600', doneColor: '#00ff66', background: 'solid', color: '#000000', padding: 10 },
+  default: {},
+  stream: { fontSize: 16, textEffect: 'outline', textColor: '#ffffff', accentColor: '#ffd84d', doneColor: '#7dff7d', iconEffect: 'shadow' },
+  minimal: { fontSize: 12, bold: false, textEffect: 'none', iconGap: 0, rowGap: 2, padding: 4 },
+  dungeon: { font: 'Georgia', accentColor: '#e0655f', doneColor: '#f0ad4e', iconEffect: 'shadow', background: 'brick', padding: 10 },
+  contrast: { textEffect: 'none', textColor: '#ffffff', accentColor: '#ffe600', doneColor: '#00ff66', background: 'solid', color: '#000000', padding: 10 },
 };
 const $ = id => document.getElementById(id);
 const overlayUrl = new URL('overlay.html', location.href).href;
 let config = null;
+let lang = 'en';
+let desktop = false;
+let obsUrl = overlayUrl;
 let saveFileError = '';
+const tr = (key, vars) => I18N.t(lang, key, vars);
 
 function checkbox(parent, label, checked, onChange) {
   const l = document.createElement('label'), c = document.createElement('input');
@@ -36,7 +41,7 @@ function checkbox(parent, label, checked, onChange) {
 async function save() {
   const r = await fetch('api/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(config) });
   const body = await r.json();
-  if (!r.ok) return body.error || 'No se pudo guardar';
+  if (!r.ok) return body.error || tr('save.failed');
   config = body;
   syncPreviewSize();
   syncIconControls();
@@ -57,9 +62,7 @@ function syncIconControls() {
   const size = o.iconAuto ? MIN_AUTO_ICON : o.iconSize;
   const floorRow = o.floorGroups ? FLOOR_LABEL_HEIGHT : 0;
   const needed = o.rows * (size + floorRow) + (o.rows - 1) * o.iconGap + o.padding * 2;
-  $('iconNote').textContent = o.layout === 'banner' && o.rows && needed > BANNER_HEIGHT
-    ? `Esas filas necesitan ${needed} px de alto: en el banner de ${BANNER_HEIGHT} px se cortarán. Reduce las filas o el tamaño, o agranda la ventana.`
-    : '';
+  $('iconNote').textContent = o.layout === 'banner' && o.rows && needed > BANNER_HEIGHT ? tr('look.rowsTooTall', { needed, height: BANNER_HEIGHT }) : '';
 }
 
 function toggleInList(list, id, on) {
@@ -69,9 +72,9 @@ function toggleInList(list, id, on) {
 }
 
 function saveLabel(s) {
-  const owner = s.account === 'local' ? 'Local' : `Cuenta ${s.account}`;
-  const prog = s.deadGod ? 'Dead God' : s.achievements ? `${s.achievements.done}/${s.achievements.total} logros` : 'sin datos';
-  return `${owner} · ranura ${s.slot} · ${prog} · ${new Date(s.mtime).toLocaleDateString()}`;
+  const owner = s.account === 'local' ? tr('save.local') : tr('save.account', { account: s.account });
+  const prog = s.deadGod ? 'Dead God' : s.achievements ? tr('save.achievements', s.achievements) : tr('save.noData');
+  return `${owner} · ${tr('save.slot', { slot: s.slot })} · ${prog} · ${new Date(s.mtime).toLocaleDateString(lang)}`;
 }
 
 async function setSaveFile(file) {
@@ -85,14 +88,14 @@ async function setSaveFile(file) {
   refreshStatus();
 }
 
-function initSavePicker(state, choices) {
+function initSavePicker(choices) {
   const select = $('saveId');
   for (const s of choices.saves) select.add(new Option(saveLabel(s), s.id));
-  select.add(new Option('Otro archivo…', CUSTOM_SAVE));
-  if (!config.saveId) select.add(new Option('Elige un guardado…', ''), 0);
+  select.add(new Option(tr('save.other'), CUSTOM_SAVE));
+  if (!config.saveId) select.add(new Option(tr('save.choose'), ''), 0);
   // Si el guardado elegido ya no existe, se indica en vez de mostrar otro en su lugar.
   if (config.saveId && config.saveId !== CUSTOM_SAVE && !choices.saves.some(s => s.id === config.saveId)) {
-    select.add(new Option(`${config.saveId} (no encontrado)`, config.saveId), 0);
+    select.add(new Option(tr('save.notFound', { id: config.saveId }), config.saveId), 0);
   }
   select.value = config.saveId || '';
   $('saveFile').value = config.saveFile;
@@ -137,8 +140,8 @@ function initOptions() {
 
 function initThemes(appearance) {
   const select = $('theme');
-  select.add(new Option('Aplicar un tema…', ''));
-  for (const name of Object.keys(THEMES)) select.add(new Option(name, name));
+  select.add(new Option(tr('look.applyTheme'), ''));
+  for (const id of Object.keys(THEMES)) select.add(new Option(tr('theme.' + id), id));
   select.addEventListener('change', async () => {
     if (!select.value) return;
     Object.assign(config.options, appearance, THEMES[select.value]);
@@ -148,41 +151,92 @@ function initThemes(appearance) {
   });
 }
 
+// Cambiar de idioma recarga el panel: así todos los textos, también los que vienen del servidor, salen ya traducidos.
+function initLanguage(languages) {
+  const select = $('language');
+  for (const [id, name] of Object.entries(languages)) select.add(new Option(name, id));
+  select.value = lang;
+  select.addEventListener('change', async () => {
+    config.language = select.value;
+    await save();
+    location.reload();
+  });
+}
+
+function initAbout() {
+  const [before, after = ''] = tr('about.supportText').split('{link}');
+  const a = document.createElement('a');
+  a.href = KOFI; a.target = '_blank'; a.rel = 'noopener'; a.textContent = 'Ko-fi';
+  $('supportText').replaceChildren(before, a, after);
+}
+
+// En la aplicación de escritorio, el enlace para OBS solo existe si el usuario lo activa.
+function initObs() {
+  if (!desktop) return;
+  $('obsOption').hidden = false;
+  $('obsNote').hidden = false;
+  $('obsServer').checked = !!config.obsServer;
+  $('obsServer').addEventListener('change', async () => {
+    config.obsServer = $('obsServer').checked;
+    await save();
+    refreshStatus();
+  });
+}
+
+function syncObs(obs) {
+  if (!desktop) return;
+  const running = !!(obs && obs.running);
+  if (obs && obs.url) obsUrl = obs.url;
+  $('link').textContent = obsUrl;
+  $('linkRow').hidden = !running;
+  $('copyLink').hidden = !running;
+  $('obsNote').className = 'note' + (obs && obs.error ? ' error' : '');
+  $('obsNote').textContent = obs && obs.error ? tr('obs.portBusy', { port: obs.port }) : tr('obs.serverNote');
+}
+
 async function refreshStatus() {
   const s = await fetch('api/state').then(r => r.json());
   const logErr = s.sources.log.error, src = s.sources.save;
   $('logStatus').className = 'note' + (logErr ? ' error' : '');
-  $('logStatus').textContent = logErr ? 'No se puede leer log.txt: ' + logErr : s.run ? `Siguiendo la partida ${s.run.seed} (ranura ${s.run.slot}).` : 'Sin partida en el log.';
+  $('logStatus').textContent = logErr ? tr('run.logError', { error: logErr }) : s.run ? tr('run.following', { seed: s.run.seed, slot: s.run.slot }) : tr('run.none');
   const error = saveFileError || src.error;
   $('saveStatus').className = 'note' + (error ? ' error' : '');
   if (saveFileError) $('saveStatus').textContent = saveFileError;
-  else if (src.error) $('saveStatus').textContent = (s.progress ? 'Mostrando la última lectura válida. ' : '') + src.error;
-  else $('saveStatus').textContent = `Leyendo ${src.file}${s.progress && s.progress.complete ? '. Está al 100%: el progreso no se muestra.' : ''}`;
+  else if (src.error) $('saveStatus').textContent = (s.progress ? tr('save.lastValid') : '') + src.error;
+  else $('saveStatus').textContent = tr('save.reading', { file: src.file }) + (s.progress && s.progress.complete ? tr('save.complete') : '');
+  syncObs(s.obs);
 }
 
 async function init() {
   const [state, choices] = await Promise.all([fetch('api/state').then(r => r.json()), fetch('api/choices').then(r => r.json())]);
   config = state.config;
+  lang = state.lang;
+  desktop = state.desktop;
+  document.documentElement.lang = lang;
+  I18N.apply(lang, document);
 
   syncPreviewSize();
-  initSavePicker(state, choices);
-  const group = (parent, labels) => {
-    for (const [k, label] of Object.entries(labels)) checkbox(parent, label, config.show[k], on => { config.show[k] = on; save(); });
+  initLanguage(choices.languages);
+  initAbout();
+  initSavePicker(choices);
+  const group = (parent, keys, prefix) => {
+    for (const k of keys) checkbox(parent, tr(prefix + k), config.show[k], on => { config.show[k] = on; save(); });
   };
-  group($('showRun'), RUN_SHOW);
-  group($('showProgress'), PROGRESS_SHOW);
+  group($('showRun'), RUN_SHOW, 'run.');
+  group($('showProgress'), PROGRESS_SHOW, 'progress.');
   for (const g of choices.goals) checkbox($('goals'), g.name, config.goals.includes(g.id), on => { toggleInList(config.goals, g.id, on); save(); });
   for (const w of choices.watched) checkbox($('watched'), w.name, config.watched.includes(w.id), on => { toggleInList(config.watched, w.id, on); save(); });
   initOptions();
   syncIconControls();
   initThemes(choices.appearance);
+  initObs();
 
   $('testHighlight').addEventListener('click', () => $('preview').contentWindow.testHighlight());
-  $('link').textContent = overlayUrl;
+  $('link').textContent = obsUrl;
   $('copyLink').addEventListener('click', async () => {
-    await navigator.clipboard.writeText(overlayUrl);
-    $('copyLink').textContent = 'Enlace copiado';
-    setTimeout(() => { $('copyLink').textContent = 'Copiar enlace para OBS'; }, 1500);
+    await navigator.clipboard.writeText(obsUrl);
+    $('copyLink').textContent = tr('panel.linkCopied');
+    setTimeout(() => { $('copyLink').textContent = tr('panel.copyLink'); }, 1500);
   });
   $('openWindow').addEventListener('click', () => window.open(overlayUrl, 'isaac-tracker', WINDOW_FEATURES));
 

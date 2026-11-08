@@ -1,40 +1,14 @@
-// MultiTracker: servidor local sin dependencias. Solo escucha en este PC.
+// MultiTracker con Node, sin la aplicación de escritorio: sirve el panel y la vista en http://localhost.
+// La aplicación de escritorio (desktop/main.js) reutiliza listen() para la fuente de navegador de OBS.
 const fs = require('fs');
 const http = require('http');
 const path = require('path');
-const { execFile } = require('child_process');
-const { resolvePaths } = require('./paths.js');
-const { createTracker } = require('./tracker.js');
 const { send } = require('./lib/http.js');
-const { IS_EXE, BASE_DIR } = require('./lib/runtime.js');
 
-const PORT = process.env.PORT || 7374;
-const URL_BASE = `http://localhost:${PORT}`;
-const paths = resolvePaths(BASE_DIR);
+const DEFAULT_PORT = 7374;
 
-// El .exe se abre con doble clic: abre el panel por su cuenta.
-function openPanel() {
-  if (IS_EXE && !process.argv.includes('--no-open')) execFile('cmd', ['/c', 'start', '', URL_BASE]);
-}
-
-// Con doble clic, la consola se cerraría antes de poder leer el error.
-function failAndWait(message) {
-  console.error(message);
-  if (!IS_EXE) process.exit(1);
-  console.error('\nPulsa Enter para cerrar.');
-  process.stdin.once('data', () => process.exit(1));
-}
-
-if (!paths.resDir || !fs.existsSync(path.join(paths.resDir, 'items.xml'))) {
-  failAndWait(`No se encuentran los recursos extraídos del juego.
-
-1. Ejecuta tools\\ResourceExtractor\\ResourceExtractor.exe, en la carpeta del juego en Steam.
-2. Vuelve a iniciar MultiTracker.
-
-Si ya los extrajiste en otra carpeta, indícala en multitracker.config.json (consulta el README).`);
-} else {
-  const { handle } = createTracker(paths);
-
+// Solo escucha en este PC. Llama a onReady(error) cuando el puerto está abierto o no se ha podido abrir.
+function listen(handle, port, onReady = () => {}) {
   const server = http.createServer(async (req, res) => {
     try {
       const url = new URL(req.url, 'http://localhost');
@@ -44,16 +18,34 @@ Si ya los extrajiste en otra carpeta, indícala en multitracker.config.json (con
       send(res, 500, { error: String(e.message || e) });
     }
   });
+  server.once('error', onReady);
+  server.listen(port, '127.0.0.1', () => { server.off('error', onReady); onReady(null); });
+  return server;
+}
 
-  server.on('error', e => {
-    if (e.code !== 'EADDRINUSE') throw e;
-    console.log(`MultiTracker ya está en marcha en ${URL_BASE}`);
-    openPanel();
-  });
-  server.listen(PORT, '127.0.0.1', () => {
-    console.log(`MultiTracker en ${URL_BASE}`);
-    console.log(`Vista para OBS: ${URL_BASE}/overlay.html`);
-    if (IS_EXE) console.log('\nDeja esta ventana abierta mientras uses el tracker.');
-    openPanel();
+const hasResources = paths => !!paths.resDir && fs.existsSync(path.join(paths.resDir, 'items.xml'));
+
+module.exports = { listen, hasResources, DEFAULT_PORT };
+
+if (require.main === module) {
+  const { resolvePaths } = require('./paths.js');
+  const { createTracker } = require('./tracker.js');
+  const { BASE_DIR } = require('./lib/runtime.js');
+  const { t, resolve } = require('./app/i18n.js');
+
+  const PORT = Number(process.env.PORT) || DEFAULT_PORT;
+  const URL_BASE = `http://localhost:${PORT}`;
+  const paths = resolvePaths(BASE_DIR);
+  if (!hasResources(paths)) {
+    const lang = resolve(Intl.DateTimeFormat().resolvedOptions().locale);
+    console.error(`${t(lang, 'start.noResources')}\n\n${t(lang, 'start.noResourcesSteps')}`);
+    process.exit(1);
+  }
+  const { handle } = createTracker(paths);
+  listen(handle, PORT, e => {
+    if (e && e.code === 'EADDRINUSE') return console.log(`MultiTracker: ${URL_BASE}`);
+    if (e) throw e;
+    console.log(`MultiTracker: ${URL_BASE}`);
+    console.log(`OBS: ${URL_BASE}/overlay.html`);
   });
 }

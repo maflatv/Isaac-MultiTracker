@@ -1,17 +1,23 @@
 MultiTracker, por Mafla
 https://github.com/maflatv/MultiTracker
 
-ANTES DE EMPEZAR
+ANTES DE EMPEZAR / BEFORE YOU START
 Pon MultiTracker.exe en su propia carpeta: tus ajustes se guardarán junto a él.
+Put MultiTracker.exe in its own folder: your settings are saved next to it.
 Hace falta The Binding of Isaac: Repentance+ en Steam, en Windows de 64 bits.
 
 1. En la carpeta del juego en Steam, ejecuta una vez
    tools\ResourceExtractor\ResourceExtractor.exe
-2. Abre MultiTracker.exe. El panel se abrirá en tu navegador.
-3. Elige tu guardado en el panel.
+   (Run it once, in the game's Steam folder.)
+2. Abre MultiTracker.exe. Es portable: no se instala ni usa un servidor.
+   (Open MultiTracker.exe. It is portable: no installation, no server.)
+3. Elige tu guardado y tu idioma en el panel. El idioma por defecto es el inglés.
+   (Choose your save and language in the panel. English is the default.)
 
-Deja abierta la ventana de MultiTracker mientras lo uses.
-Para OBS, añade una fuente de navegador con http://localhost:7374/overlay.html
+OBS
+Captura la ventana "MultiTracker · Tracker" con una Captura de ventana.
+Para usar una fuente de navegador, actívala en el panel y usa
+http://localhost:7374/overlay.html
 
 AVISO DE WINDOWS
 El programa no tiene firma digital, así que Windows puede mostrar un aviso.
@@ -19,5 +25,5 @@ Para continuar, pulsa "Más información" y luego "Ejecutar de todas formas".
 
 LICENCIAS
 LICENSE.txt: MultiTracker (MIT)
-LICENSE-Node.txt: Node.js, incluido dentro del ejecutable
-LICENSE-RebirthItemTracker.txt: datos de objetos de Rebirth Item Tracker
+LICENSE-Electron.txt y LICENSES-Chromium.html: Electron y Chromium, incluidos en el ejecutable
+LICENSE-RebirthItemTracker.txt: datos de objetos de Rebirth Item Tracker y sus traducciones

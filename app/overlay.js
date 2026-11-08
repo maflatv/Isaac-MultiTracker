@@ -12,7 +12,8 @@ const NEW_RUN_GRACE_MS = 2000;
 // Tiempo de cada página cuando el progreso no cabe en el lateral del banner.
 const PAGE_MS = 5000;
 // Antes de ocultar objetos se prueban iconos más pequeños.
-const OWNERS = { jacob: { name: 'Jacob', letter: 'J' }, esau: { name: 'Esaú', letter: 'E' } };
+// La letra es la del nombre en inglés, como en el juego; el nombre completo sale traducido.
+const OWNERS = { jacob: { key: 'view.jacob', letter: 'J' }, esau: { key: 'view.esau', letter: 'E' } };
 const LABEL_ROOM = 6; // separación mínima entre el código de un piso y el del siguiente
 const FIT_ICON_SIZES = [32, 28, 24];
 // El banner usa el mayor tamaño que quepa, para aprovechar todo el espacio.
@@ -21,6 +22,9 @@ const BANNER_ICON_SIZES = [96, 80, 64, 56, 48, 40, ...FIT_ICON_SIZES];
 const view = document.getElementById('view');
 const hero = document.getElementById('hero');
 let names = { goals: {}, watched: {} };
+let lang = 'en';
+let namesLang = null;
+const tr = (key, vars) => I18N.t(lang, key, vars);
 let lastState = '';
 let current = null;
 const seen = { seed: null, count: 0, since: 0 };
@@ -59,9 +63,9 @@ function pips(label, count, goal) {
 
 // La racha es del guardado, no de la partida: se muestra también sin partida y en guardados al 100%.
 function streakTag(p) {
-  const tagEl = el('span', 'streak', 'Racha ');
+  const tagEl = el('span', 'streak', tr('view.streak'));
   tagEl.append(el('b', '', String(p.winStreak)));
-  tagEl.title = `Mejor racha: ${p.bestStreak}`;
+  tagEl.title = tr('view.bestStreak', { best: p.bestStreak });
   return tagEl;
 }
 
@@ -74,18 +78,40 @@ function whoBlock(s) {
   return w;
 }
 
+// Icono de cada total: el logro de Steam que lo representa o, para la colección, Breakfast del propio juego.
+const TOTAL_ICONS = {
+  achievements: 'icon/achievement/637.jpg', items: 'icon/item/25.png', marksHard: 'icon/achievement/636.jpg',
+  marksAny: 'icon/achievement/636.jpg', challenges: 'icon/achievement/280.jpg',
+};
+// "c64" o "s23" -> icono del logro 64 o 23.
+const achievementIcon = id => `icon/achievement/${String(id).replace(/^\D+/, '')}.jpg`;
+
+// Logro como icono, igual que en Steam. Sin icono (sin internet, por ejemplo) se muestra la versión en texto.
+function achTile(src, title, done, value, fallback) {
+  const t = el('span', 'ach' + (done ? ' done' : ''));
+  t.title = title;
+  const img = el('img');
+  img.src = src;
+  img.alt = '';
+  img.onerror = () => t.replaceWith(fallback());
+  t.append(img);
+  if (value) t.append(el('b', '', value));
+  return t;
+}
+
 // Un guardado al 100% no tiene nada pendiente: no se muestra su progreso.
 function progressBlocks(s) {
   const p = s.progress;
   const meters = el('div', 'meters'), tags = el('div', 'tags');
   if (!p || p.complete) return [meters, tags];
   const { show, goals, watched, options } = s.config;
+  if (options.progressStyle === 'icons') return [meters, iconGrid(p, show, goals, watched, options)];
   const add = (on, label, x) => { if (on && !(options.hideDone && x.done >= x.total)) meters.append(meter(label, x.done, x.total)); };
-  add(show.achievements, 'Logros', p.achievements);
-  add(show.collection, 'Objetos', p.items);
-  add(show.marksHard, 'Marcas difíciles', p.marksHard);
-  add(show.marksAny, 'Marcas', p.marksAny);
-  add(show.challenges, 'Retos', p.challenges);
+  add(show.achievements, tr('view.achievements'), p.achievements);
+  add(show.collection, tr('view.items'), p.items);
+  add(show.marksHard, tr('view.marksHard'), p.marksHard);
+  add(show.marksAny, tr('view.marks'), p.marksAny);
+  add(show.challenges, tr('view.challenges'), p.challenges);
   for (const g of p.goals) {
     if (!goals.includes(g.id) || (options.hideDone && g.done)) continue;
     const name = names.goals[g.id] || g.id;
@@ -96,6 +122,34 @@ function progressBlocks(s) {
     if (watched.includes(w.id) && !(options.hideDone && w.done)) tags.append(tag(names.watched[w.id] || w.id, w.done));
   }
   return [meters, tags];
+}
+
+// Como el Deadgod Tracker: totales y contadores con su cifra al lado; los logros vigilados, solo el icono.
+function iconGrid(p, show, goals, watched, options) {
+  const grid = el('div', 'achs' + (options.pendingLook === 'gray' ? ' gray' : ''));
+  const total = (on, key, label, x) => {
+    const done = x.done >= x.total;
+    if (!on || (options.hideDone && done)) return;
+    const value = `${x.done}/${x.total}`;
+    grid.append(achTile(TOTAL_ICONS[key], `${label} ${value}`, done, value, () => meter(label, x.done, x.total)));
+  };
+  total(show.achievements, 'achievements', tr('view.achievements'), p.achievements);
+  total(show.collection, 'items', tr('view.items'), p.items);
+  total(show.marksHard, 'marksHard', tr('view.marksHard'), p.marksHard);
+  total(show.marksAny, 'marksAny', tr('view.marks'), p.marksAny);
+  total(show.challenges, 'challenges', tr('view.challenges'), p.challenges);
+  for (const g of p.goals) {
+    if (!goals.includes(g.id) || (options.hideDone && g.done)) continue;
+    const name = names.goals[g.id] || g.id;
+    const value = g.done ? '' : `${g.value}/${g.goal}`;
+    grid.append(achTile(achievementIcon(g.id), value ? `${name} ${value}` : name, g.done, value, () => (g.done ? tag(name, true) : meter(name, g.value, g.goal))));
+  }
+  for (const w of p.watched) {
+    if (!watched.includes(w.id) || (options.hideDone && w.done)) continue;
+    const name = names.watched[w.id] || w.id;
+    grid.append(achTile(achievementIcon(w.id), name, w.done, '', () => tag(name, w.done)));
+  }
+  return grid;
 }
 
 function transformBlock(s) {
@@ -118,7 +172,7 @@ function stripRow(s) {
 }
 
 function sideColumn(s) {
-  const side = el('div', 'side');
+  const side = el('div', 'side' + (s.config.options.progressStyle === 'icons' ? ' icons' : ''));
   const who = whoBlock(s);
   const [meters, tags] = progressBlocks(s);
   const pages = el('div', 'pages');
@@ -152,10 +206,10 @@ function paginateSide(padding) {
 
 // Un bloque de etiquetas más alto que el espacio se reparte en varios, que ya caben en una página.
 function splitTallBlocks(pages, room) {
-  for (const block of [...pages.querySelectorAll(':scope > .tags')]) {
+  for (const block of [...pages.querySelectorAll(':scope > .tags, :scope > .achs')]) {
     let current = block;
     while (current.offsetHeight > room && current.children.length > 1) {
-      const rest = el('div', 'tags');
+      const rest = el('div', block.className);
       current.after(rest);
       while (current.offsetHeight > room && current.children.length > 1) rest.prepend(current.lastElementChild);
       current = rest;
@@ -175,7 +229,7 @@ setInterval(() => {
 
 function itemTile(i, latest) {
   const t = el('div', 'item' + (i.removed ? ' removed' : '') + (i.blind ? ' blind' : '') + (latest ? ' latest' : ''));
-  t.title = `${i.name}${i.desc ? ' — ' + i.desc : ''}${i.floorLabel ? ' (' + i.floorLabel + ')' : ''}${i.blind ? ' — Maldición del ciego' : ''}`;
+  t.title = `${i.name}${i.desc ? ' — ' + i.desc : ''}${i.floorLabel ? ' (' + i.floorLabel + ')' : ''}${i.blind ? ' — ' + tr('view.blind') : ''}`;
   const img = el('img');
   img.src = `icon/item/${i.id}.png`;
   img.alt = i.name;
@@ -184,7 +238,7 @@ function itemTile(i, latest) {
   t.append(img);
   const owner = OWNERS[i.owner];
   if (owner) {
-    t.title += ' — ' + owner.name;
+    t.title += ' — ' + tr(owner.key);
     t.append(el('span', 'owner-badge ' + i.owner, owner.letter));
   }
   return t;
@@ -259,6 +313,8 @@ function applyStyle(o) {
     ...TEXT_SCALE[PIXEL_FONTS.includes(o.font) ? 'pixel' : 'regular'],
     '--font': `"${o.font}", system-ui, sans-serif`, '--size': o.fontSize + 'px', '--weight': o.bold ? 600 : 400,
     '--text': o.textColor, '--accent': o.accentColor, '--done': o.doneColor, '--text-shadow': TEXT_EFFECTS[o.textEffect], '--blind': o.blindColor,
+    // Iconos de logros proporcionales al texto: 28 px con el tamaño por defecto (20).
+    '--ach': Math.round(o.fontSize * 1.4) + 'px',
     '--icon': o.iconSize + 'px', '--icon-gap': o.iconGap + 'px', '--icon-filter': icon[o.iconEffect],
     '--row-gap': o.rowGap + 'px', '--padding': o.padding + 'px', '--radius': o.radius + 'px',
     '--align': o.align, '--justify': JUSTIFY[o.align],
@@ -286,7 +342,7 @@ function render(s) {
     else if (desc.length) body.push(main);
     main.append(...desc.filter(p => p.childNodes.length));
   } else body.push(...desc.filter(p => p.childNodes.length));
-  if (!s.run) body.push(el('div', 'waiting', 'Esperando partida…'));
+  if (!s.run) body.push(el('div', 'waiting', tr('view.waiting')));
   view.replaceChildren(...body);
   paginateSide(options.padding);
   fitShelf(options);
@@ -349,9 +405,9 @@ function buildHero(item, seconds) {
   img.onerror = () => img.remove();
   icon.append(el('div', 'hero-rays'), img);
   const text = el('div', 'hero-text');
-  text.append(el('small', '', item.floorLabel ? `Nuevo objeto · ${item.floorLabel}` : 'Nuevo objeto'));
-  if (OWNERS[item.owner]) text.firstChild.append(` · ${OWNERS[item.owner].name}`);
-  if (item.blind) text.firstChild.append(el('span', 'hero-blind', ' · Maldición del ciego'));
+  text.append(el('small', '', item.floorLabel ? `${tr('view.newItem')} · ${item.floorLabel}` : tr('view.newItem')));
+  if (OWNERS[item.owner]) text.firstChild.append(` · ${tr(OWNERS[item.owner].key)}`);
+  if (item.blind) text.firstChild.append(el('span', 'hero-blind', ' · ' + tr('view.blind')));
   text.append(el('strong', '', item.name));
   if (item.desc) text.append(el('p', '', item.desc));
   const timer = el('div', 'hero-timer');
@@ -397,6 +453,12 @@ async function refresh() {
   if (text === lastState) return;
   lastState = text;
   current = JSON.parse(text);
+  lang = current.lang;
+  document.documentElement.lang = lang;
+  if (lang !== namesLang) {
+    namesLang = lang;
+    try { await loadNames(); } catch { namesLang = null; }
+  }
   render(current);
   detectPickups(current);
 }
@@ -408,9 +470,13 @@ async function tick() {
 
 window.addEventListener('resize', () => { if (current) render(current); });
 
-fetch('api/choices').then(r => r.json()).then(c => {
+// Los nombres de contadores y logros dependen del idioma: se vuelven a pedir cuando cambia.
+async function loadNames() {
+  const c = await fetch('api/choices').then(r => r.json());
   names = {
     goals: Object.fromEntries(c.goals.map(g => [g.id, g.name])),
     watched: Object.fromEntries(c.watched.map(w => [w.id, w.name])),
   };
-}).finally(tick);
+}
+
+tick();

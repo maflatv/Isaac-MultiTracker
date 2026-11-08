@@ -8,151 +8,166 @@
 </head>
 <body>
 <header>
-  <h1><a class="back" href="/" title="Volver a Isaac Suite" aria-label="Volver a Isaac Suite">←</a>Tracker</h1>
+  <h1><a class="back" href="/" data-i18n-title="panel.back" data-i18n-aria="panel.back">←</a>MultiTracker</h1>
   <div class="actions">
-    <button id="about">Acerca de</button>
-    <button id="copyLink">Copiar enlace para OBS</button>
-    <button id="openWindow" class="primary">Abrir en ventana</button>
+    <label class="lang"><span data-i18n="panel.language"></span> <select id="language"></select></label>
+    <button id="about" data-i18n="panel.about"></button>
+    <button id="copyLink" data-i18n="panel.copyLink"></button>
+    <button id="openWindow" class="primary" data-i18n="panel.openWindow"></button>
   </div>
 </header>
 <main>
   <form id="form">
     <section>
-      <h2>Archivo de guardado</h2>
-      <select id="saveId" aria-label="Guardado"></select>
+      <h2 data-i18n="save.title"></h2>
+      <select id="saveId" data-i18n-aria="save.aria"></select>
       <div id="customSave" class="path-row" hidden>
-        <input id="saveFile" aria-label="Ruta del archivo de guardado" placeholder="Ruta completa del archivo .dat" spellcheck="false">
-        <button type="button" id="browseSave">Examinar…</button>
+        <input id="saveFile" data-i18n-aria="save.pathAria" data-i18n-placeholder="save.pathPlaceholder" spellcheck="false">
+        <button type="button" id="browseSave" data-i18n="save.browse"></button>
       </div>
       <p class="note" id="saveStatus"></p>
     </section>
     <section>
-      <h2>Partida actual</h2>
+      <h2 data-i18n="run.title"></h2>
       <div id="showRun" class="checks"></div>
       <p class="note" id="logStatus"></p>
     </section>
     <section>
-      <h2>Progreso general</h2>
+      <h2 data-i18n="progress.title"></h2>
       <div id="showProgress" class="checks"></div>
+      <div class="fields spaced">
+        <label><span data-i18n="progress.style"></span>
+          <select data-option="progressStyle"><option value="icons" data-i18n="progress.icons"></option><option value="text" data-i18n="progress.text"></option></select>
+        </label>
+        <label><span data-i18n="progress.pending"></span>
+          <select data-option="pendingLook"><option value="color" data-i18n="progress.pendingColor"></option><option value="gray" data-i18n="progress.pendingGray"></option></select>
+        </label>
+      </div>
+      <p class="note" data-i18n="progress.iconsNote"></p>
     </section>
     <section>
-      <h2>Contadores</h2>
+      <h2 data-i18n="goals.title"></h2>
       <div id="goals" class="checks"></div>
     </section>
     <section>
-      <h2>Logros vigilados</h2>
+      <h2 data-i18n="watched.title"></h2>
       <div id="watched" class="checks"></div>
     </section>
     <section>
-      <h2>Qué mostrar de los objetos</h2>
+      <h2 data-i18n="items.title"></h2>
       <div class="fields">
-        <label>Máximo de objetos (0 = todos) <input type="number" data-option="maxItems" min="0" max="200"></label>
-        <label>Objetos perdidos
-          <select data-option="removed"><option value="dim">Atenuados</option><option value="hide">Ocultos</option></select>
+        <label><span data-i18n="items.max"></span> <input type="number" data-option="maxItems" min="0" max="200"></label>
+        <label><span data-i18n="items.removed"></span>
+          <select data-option="removed"><option value="dim" data-i18n="items.dim"></option><option value="hide" data-i18n="items.hide"></option></select>
         </label>
       </div>
       <div class="checks">
-        <label><input type="checkbox" data-option="hideDone"> Ocultar lo ya completado</label>
-        <label><input type="checkbox" data-option="floorGroups"> Separar objetos por piso</label>
-        <label><input type="checkbox" data-option="transformsClose"> Solo transformaciones desde 2/3</label>
+        <label><input type="checkbox" data-option="hideDone"> <span data-i18n="items.hideDone"></span></label>
+        <label><input type="checkbox" data-option="floorGroups"> <span data-i18n="items.floorGroups"></span></label>
+        <label><input type="checkbox" data-option="transformsClose"> <span data-i18n="items.transformsClose"></span></label>
       </div>
     </section>
     <section>
-      <h2>Objeto recién tomado</h2>
-      <div class="checks"><label><input type="checkbox" data-option="highlight"> Destacarlo con una animación</label></div>
+      <h2 data-i18n="highlight.title"></h2>
+      <div class="checks"><label><input type="checkbox" data-option="highlight"> <span data-i18n="highlight.on"></span></label></div>
       <div class="fields">
-        <label>Duración de la animación (segundos) <span class="slider"><input type="range" data-option="highlightSeconds" min="2" max="20"><output></output></span></label>
+        <label><span data-i18n="highlight.seconds"></span> <span class="slider"><input type="range" data-option="highlightSeconds" min="2" max="20"><output></output></span></label>
       </div>
-      <button type="button" id="testHighlight">Probar en la vista previa</button>
+      <button type="button" id="testHighlight" data-i18n="highlight.test"></button>
     </section>
     <section>
-      <h2>Apariencia</h2>
+      <h2 data-i18n="look.title"></h2>
       <div class="fields">
-        <label>Tema
-          <select id="theme" aria-label="Aplicar un tema"></select>
+        <label><span data-i18n="look.theme"></span>
+          <select id="theme" data-i18n-aria="look.themeAria"></select>
         </label>
       </div>
-      <h3>Texto</h3>
+      <h3 data-i18n="look.text"></h3>
       <div class="fields">
-        <label>Fuente <input data-option="font" list="fonts" maxlength="40" spellcheck="false"></label>
+        <label><span data-i18n="look.font"></span> <input data-option="font" list="fonts" maxlength="40" spellcheck="false"></label>
         <datalist id="fonts">
           <option value="Upheaval"><option value="Segoe UI"><option value="Arial"><option value="Bahnschrift"><option value="Consolas"><option value="Georgia"><option value="Impact"><option value="Trebuchet MS"><option value="Verdana"><option value="Comic Sans MS">
         </datalist>
-        <label>Tamaño (Upheaval: 20 es el más nítido) <span class="slider"><input type="range" data-option="fontSize" min="10" max="32"><output></output></span></label>
-        <label>Efecto
-          <select data-option="textEffect"><option value="none">Ninguno</option><option value="shadow">Sombra</option><option value="outline">Contorno</option></select>
+        <label><span data-i18n="look.fontSize"></span> <span class="slider"><input type="range" data-option="fontSize" min="10" max="32"><output></output></span></label>
+        <label><span data-i18n="look.effect"></span>
+          <select data-option="textEffect"><option value="none" data-i18n="look.none"></option><option value="shadow" data-i18n="look.shadow"></option><option value="outline" data-i18n="look.outline"></option></select>
         </label>
-        <label>Color del texto <input type="color" data-option="textColor"></label>
-        <label>Color de los valores <input type="color" data-option="accentColor"></label>
-        <label>Color de lo completado <input type="color" data-option="doneColor"></label>
+        <label><span data-i18n="look.textColor"></span> <input type="color" data-option="textColor"></label>
+        <label><span data-i18n="look.accentColor"></span> <input type="color" data-option="accentColor"></label>
+        <label><span data-i18n="look.doneColor"></span> <input type="color" data-option="doneColor"></label>
       </div>
-      <div class="checks"><label><input type="checkbox" data-option="bold"> Texto en negrita</label></div>
-      <h3>Iconos</h3>
+      <div class="checks"><label><input type="checkbox" data-option="bold"> <span data-i18n="look.bold"></span></label></div>
+      <h3 data-i18n="look.icons"></h3>
       <div class="fields">
-        <label>Tamaño automático <input type="checkbox" data-option="iconAuto"></label>
-        <label>Tamaño fijo <span class="slider"><input type="range" data-option="iconSize" min="16" max="96" step="4"><output></output></span></label>
-        <label>Filas de objetos (0 = automático) <span class="slider"><input type="range" data-option="rows" min="0" max="8"><output></output></span></label>
-        <label>Separación <span class="slider"><input type="range" data-option="iconGap" min="0" max="16"><output></output></span></label>
-        <label>Color de la maldición del ciego <input type="color" data-option="blindColor"></label>
-        <label>Efecto
-          <select data-option="iconEffect"><option value="none">Ninguno</option><option value="glow">Brillo</option><option value="shadow">Sombra</option></select>
+        <label><span data-i18n="look.iconAuto"></span> <input type="checkbox" data-option="iconAuto"></label>
+        <label><span data-i18n="look.iconSize"></span> <span class="slider"><input type="range" data-option="iconSize" min="16" max="96" step="4"><output></output></span></label>
+        <label><span data-i18n="look.rows"></span> <span class="slider"><input type="range" data-option="rows" min="0" max="8"><output></output></span></label>
+        <label><span data-i18n="look.iconGap"></span> <span class="slider"><input type="range" data-option="iconGap" min="0" max="16"><output></output></span></label>
+        <label><span data-i18n="look.blindColor"></span> <input type="color" data-option="blindColor"></label>
+        <label><span data-i18n="look.effect"></span>
+          <select data-option="iconEffect"><option value="none" data-i18n="look.none"></option><option value="glow" data-i18n="look.glow"></option><option value="shadow" data-i18n="look.shadow"></option></select>
         </label>
       </div>
       <p class="note error" id="iconNote"></p>
-      <h3>Distribución</h3>
+      <h3 data-i18n="look.layout"></h3>
       <div class="fields">
-        <label>Modo
-          <select data-option="layout"><option value="banner">Banner (900×121)</option><option value="wide">Amplio</option></select>
+        <label><span data-i18n="look.mode"></span>
+          <select data-option="layout"><option value="banner" data-i18n="look.banner"></option><option value="wide" data-i18n="look.wide"></option></select>
         </label>
-        <label>Alineación
-          <select data-option="align"><option value="left">Izquierda</option><option value="center">Centro</option><option value="right">Derecha</option></select>
+        <label><span data-i18n="look.align"></span>
+          <select data-option="align"><option value="left" data-i18n="look.left"></option><option value="center" data-i18n="look.center"></option><option value="right" data-i18n="look.right"></option></select>
         </label>
-        <label>Objetos
-          <select data-option="itemsPosition"><option value="below">Después del texto</option><option value="above">Antes del texto</option></select>
+        <label><span data-i18n="look.itemsPosition"></span>
+          <select data-option="itemsPosition"><option value="below" data-i18n="look.itemsBelow"></option><option value="above" data-i18n="look.itemsAbove"></option></select>
         </label>
-        <label>Separación de filas <span class="slider"><input type="range" data-option="rowGap" min="0" max="24"><output></output></span></label>
-        <label>Margen interior <span class="slider"><input type="range" data-option="padding" min="0" max="32"><output></output></span></label>
+        <label><span data-i18n="look.rowGap"></span> <span class="slider"><input type="range" data-option="rowGap" min="0" max="24"><output></output></span></label>
+        <label><span data-i18n="look.padding"></span> <span class="slider"><input type="range" data-option="padding" min="0" max="32"><output></output></span></label>
       </div>
-      <h3>Fondo</h3>
+      <h3 data-i18n="look.background"></h3>
       <div class="fields">
-        <label>Tipo
-          <select data-option="background"><option value="transparent">Transparente</option><option value="solid">Color</option><option value="brick">Ladrillo</option></select>
+        <label><span data-i18n="look.bgType"></span>
+          <select data-option="background"><option value="transparent" data-i18n="look.transparent"></option><option value="solid" data-i18n="look.solid"></option><option value="brick" data-i18n="look.brick"></option></select>
         </label>
-        <label>Color <input type="color" data-option="color"></label>
-        <label>Opacidad <span class="slider"><input type="range" data-option="backgroundOpacity" min="0" max="100" step="5"><output></output></span></label>
-        <label>Esquinas redondeadas <span class="slider"><input type="range" data-option="radius" min="0" max="24"><output></output></span></label>
+        <label><span data-i18n="look.color"></span> <input type="color" data-option="color"></label>
+        <label><span data-i18n="look.opacity"></span> <span class="slider"><input type="range" data-option="backgroundOpacity" min="0" max="100" step="5"><output></output></span></label>
+        <label><span data-i18n="look.radius"></span> <span class="slider"><input type="range" data-option="radius" min="0" max="24"><output></output></span></label>
       </div>
     </section>
   </form>
   <section id="previewPane">
-    <h2>Vista previa</h2>
-    <iframe id="preview" src="overlay.html" title="Vista previa del tracker"></iframe>
-    <p class="note">Enlace para OBS (fuente de navegador, 900×121 en modo banner): <code id="link"></code></p>
+    <h2 data-i18n="preview.title"></h2>
+    <iframe id="preview" src="overlay.html" data-i18n-title="preview.frame"></iframe>
+    <div id="obsOption" class="checks single" hidden>
+      <label><input type="checkbox" id="obsServer"> <span data-i18n="obs.server"></span></label>
+    </div>
+    <p class="note" id="obsNote" hidden data-i18n="obs.serverNote"></p>
+    <p class="note" id="linkRow"><span data-i18n="preview.obsLink"></span> <code id="link"></code></p>
   </section>
 </main>
 <dialog id="aboutDialog" aria-labelledby="aboutTitle">
-  <h2 id="aboutTitle">Acerca de MultiTracker</h2>
-  <p>Objetos de la partida y progreso hacia Dead God en una sola vista.</p>
-  <h3>Créditos</h3>
+  <h2 id="aboutTitle" data-i18n="about.title"></h2>
+  <p data-i18n="about.lead"></p>
+  <h3 data-i18n="about.credits"></h3>
   <dl>
     <dt><a href="https://github.com/maflatv/MultiTracker" target="_blank" rel="noopener">MultiTracker</a></dt>
-    <dd><strong>Mafla</strong>. Creador del proyecto.</dd>
+    <dd><strong>Mafla</strong>. <span data-i18n="about.creator"></span></dd>
     <dt><a href="https://github.com/Hyphen-ated/RebirthItemTracker" target="_blank" rel="noopener">Rebirth Item Tracker</a></dt>
-    <dd><strong>Brett824 y Hyphen-ated</strong>. Descripciones de los objetos y códigos de los pisos. Licencia BSD de 2 cláusulas.</dd>
+    <dd><strong>Brett824 <span data-i18n="about.and"></span> Hyphen-ated</strong>. <span data-i18n="about.rit"></span></dd>
     <dt>Isaac Deadgod Tracker</dt>
-    <dd><strong>veryhighlibido</strong>. Inspiración para el seguimiento del progreso hacia Dead God.</dd>
-    <dt><a href="https://www.dafont.com/aenigma.d188" target="_blank" rel="noopener">Fuente Upheaval</a></dt>
-    <dd><strong>Brian Kent (Ænigma Fonts)</strong>. Fuente opcional; no se incluye con MultiTracker.</dd>
-    <dt><a href="https://nodejs.org" target="_blank" rel="noopener">Node.js</a></dt>
-    <dd><strong>OpenJS Foundation y colaboradores de Node.js</strong>. Motor incluido en el ejecutable.</dd>
+    <dd><strong>veryhighlibido</strong>. <span data-i18n="about.deadgod"></span></dd>
+    <dt><a href="https://www.dafont.com/aenigma.d188" target="_blank" rel="noopener" data-i18n="about.font"></a></dt>
+    <dd><strong>Brian Kent (Ænigma Fonts)</strong>. <span data-i18n="about.fontNote"></span></dd>
+    <dt><a href="https://www.electronjs.org" target="_blank" rel="noopener">Electron</a> (Chromium, Node.js)</dt>
+    <dd><strong>OpenJS Foundation <span data-i18n="about.and"></span> <span data-i18n="about.contributors"></span></strong>. <span data-i18n="about.electron"></span></dd>
     <dt>The Binding of Isaac: Repentance+</dt>
-    <dd><strong>Edmund McMillen y Nicalis</strong>. Iconos y nombres, leídos de tu propia copia del juego.</dd>
+    <dd><strong>Edmund McMillen <span data-i18n="about.and"></span> Nicalis</strong>. <span data-i18n="about.game"></span></dd>
   </dl>
-  <p class="note">Proyecto de fans, sin afiliación con los creadores del juego.</p>
-  <h3>Apoya el proyecto</h3>
-  <p>MultiTracker es gratuito. Si te resulta útil y quieres apoyar a Mafla, puedes hacerlo en <a href="https://ko-fi.com/maflatv" target="_blank" rel="noopener">Ko-fi</a>.</p>
-  <form method="dialog"><button class="primary">Cerrar</button></form>
+  <p class="note" data-i18n="about.fans"></p>
+  <h3 data-i18n="about.support"></h3>
+  <p id="supportText"></p>
+  <form method="dialog"><button class="primary" data-i18n="about.close"></button></form>
 </dialog>
+<script src="i18n.js"></script>
 <script src="panel.js"></script>
 </body>
 </html>

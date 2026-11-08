@@ -8,7 +8,9 @@ header { display: flex; align-items: center; justify-content: space-between; pad
 h1 { font-size: 16px; margin: 0; }
 h1 a.back { color: var(--muted); text-decoration: none; margin-right: 6px; } h1 a.back:hover { color: var(--accent2); }
 h2 { font-size: 13px; margin: 0 0 8px; }
-.actions { display: flex; gap: 6px; }
+.actions { display: flex; gap: 6px; align-items: center; }
+.actions .lang { display: flex; align-items: center; gap: 6px; color: var(--muted); margin-right: 6px; }
+[hidden] { display: none !important; }
 button, select, input { font: inherit; color: var(--text); background: var(--panel2); border: 1px solid var(--line); border-radius: 4px; padding: 4px 8px; }
 button { cursor: pointer; } button:hover { border-color: var(--accent2); }
 button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
@@ -19,9 +21,11 @@ main { display: grid; grid-template-columns: 400px 1fr; height: calc(100% - 45px
 #form section { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 10px; }
 #form select#saveId { width: 100%; }
 .checks { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 10px; margin-top: 2px; }
+.checks.single { grid-template-columns: 1fr; margin-top: 8px; }
 .checks label { display: flex; gap: 6px; align-items: flex-start; }
 .fields { display: grid; gap: 6px; margin-bottom: 8px; }
 .fields label { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.fields.spaced { margin: 8px 0 0; }
 .fields input[type=number] { width: 70px; }
 .note { color: var(--muted); font-size: 12px; margin: 6px 0 0; min-height: 1em; }
 .note.error { color: #ff9f9a; }
