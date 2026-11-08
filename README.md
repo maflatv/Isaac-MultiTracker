@@ -39,7 +39,7 @@ Requiere [Node.js](https://nodejs.org) 24. Las herramientas de compilación (Ele
 
 - **Aplicación de escritorio:** `node build/run-desktop.js`.
 - **Sin Electron:** `iniciar.bat` sirve el panel en http://localhost:7374 con Node, y `ventana.bat` abre el tracker en una ventana de Microsoft Edge.
-- **Generar el ejecutable:** `node build/build-exe.js 1.2.0` crea `MultiTracker.exe` y el `.zip` en `dist/`. Solo incluye archivos que Git publicaría: lo ignorado nunca llega al `.exe`.
+- **Generar el ejecutable:** `node build/build-exe.js 1.3.0` crea `MultiTracker.exe` y el `.zip` en `dist/`. Solo incluye archivos que Git publicaría: lo ignorado nunca llega al `.exe`.
 
 ## Qué muestra
 
@@ -50,6 +50,7 @@ Requiere [Node.js](https://nodejs.org) 24. Las herramientas de compilación (Ele
 - **Descripción al pasar el puntero:** en la ventana del tracker, el objeto bajo el puntero se marca y su nombre, descripción y piso aparecen en una franja. En el panel puedes elegir qué objeto se marca: el que está bajo el puntero, el último tomado o ninguno.
 - **Cualquier fuente instalada:** el campo **Fuente** del panel sugiere las fuentes instaladas en tu PC.
 - **Progreso hacia Dead God:** logros, colección, marcas, retos y racha actual. En un guardado al 100% solo se muestra la racha.
+- **Tiempo de juego por archivo:** MultiTracker suma el tiempo de cada partida al guardado en el que se juega y lo muestra en el panel, junto a cada archivo. En la vista puedes activar **Tiempo en este archivo** y **Tiempo de la partida**. El juego no guarda este dato: se cuenta con el contador de frames que escribe en `log.txt`, así que no incluye menús ni pausas, y solo se registra desde que usas MultiTracker. Ábrelo en cada sesión de juego: no hace falta que esté abierto todo el rato, pero sí antes de volver a abrir el juego, que vacía el log al arrancar. Continuar una partida suma también lo jugado antes en ella.
 - **Logros como iconos:** los contadores y los logros vigilados se muestran con los iconos de sus logros de Steam, con una ✓ en los conseguidos. MultiTracker sabe qué icono corresponde a cada logro por el esquema que Steam guarda en tu PC (`appcache/stats`), descarga cada imagen una vez de la CDN de Steam y la guarda en `userdata/cache/achievements/`. Sin conexión, o eligiendo **Texto y barras** en el panel, se muestran con texto.
 
 Si el guardado elegido no se encuentra, MultiTracker muestra un error en lugar de cambiar a otro.
@@ -64,7 +65,7 @@ MultiTracker busca sola las carpetas, incluidas otras bibliotecas de Steam. Si n
 | `gameDir` | La que contiene `log.txt`, en `Documents/My Games/Binding of Isaac Repentance+` |
 | `steamUserdata` | `userdata` de Steam, donde están los guardados |
 
-El archivo debe estar junto a `MultiTracker.exe`. Tus ajustes se guardan en `userdata/`, también junto a él: `config.json` (guardado, idioma, opciones y apariencia) y `windows.json` (posición de las ventanas).
+El archivo debe estar junto a `MultiTracker.exe`. Tus ajustes se guardan en `userdata/`, también junto a él: `config.json` (guardado, idioma, opciones y apariencia), `windows.json` (posición de las ventanas) y `playtime.json` (tiempo de juego de cada archivo). Si mueves `MultiTracker.exe`, lleva `userdata/` con él: el tiempo registrado no se puede volver a calcular.
 
 ## Fuente Upheaval (opcional)
 

@@ -41,6 +41,16 @@ function findSaveDir() {
   return candidates.find(d => fs.existsSync(d)) || candidates[0];
 }
 
+// Cuenta de Steam con la sesión abierta (el número de su carpeta en userdata), o null si Steam no está abierto.
+function activeSteamAccount() {
+  try {
+    const out = execFileSync('reg', ['query', 'HKCU\\Software\\Valve\\Steam\\ActiveProcess', '/v', 'ActiveUser'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], windowsHide: true });
+    const m = /ActiveUser\s+REG_DWORD\s+0x([0-9a-f]+)/i.exec(out);
+    const id = m ? parseInt(m[1], 16) : 0;
+    return id ? String(id) : null;
+  } catch { return null; }
+}
+
 function resolvePaths(baseDir) {
   const own = readJson(path.join(baseDir, 'multitracker.config.json'), {});
   const steam = steamDir();
@@ -54,4 +64,4 @@ function resolvePaths(baseDir) {
   };
 }
 
-module.exports = { resolvePaths };
+module.exports = { resolvePaths, activeSteamAccount };

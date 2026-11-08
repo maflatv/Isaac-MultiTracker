@@ -41,6 +41,13 @@
       'run.description': 'Descripción del último objeto',
       'run.transforms': 'Transformaciones',
       'run.logError': 'No se puede leer log.txt: {error}',
+      'run.runTime': 'Tiempo de la partida',
+      'progress.playtime': 'Tiempo en este archivo',
+      'view.playtime': 'Tiempo ',
+      'time.hm': '{h} h {m} min',
+      'time.m': '{m} min',
+      'save.playtime': '. Tiempo registrado: {time}',
+      'save.playtimeNote': 'El tiempo de juego se registra desde que usas MultiTracker: abre el tracker en cada sesión de juego. No cuenta menús ni pausas.',
       'run.noLog': 'Aún no hay log.txt: abre el juego para empezar.',
       'run.following': 'Siguiendo la partida {seed} (ranura {slot}).',
       'run.none': 'Sin partida en el log.',
@@ -221,6 +228,13 @@
       'run.description': 'Description of the last item',
       'run.transforms': 'Transformations',
       'run.logError': 'Cannot read log.txt: {error}',
+      'run.runTime': 'Run time',
+      'progress.playtime': 'Time on this save',
+      'view.playtime': 'Time ',
+      'time.hm': '{h}h {m}m',
+      'time.m': '{m}m',
+      'save.playtime': '. Time recorded: {time}',
+      'save.playtimeNote': 'Play time is recorded since you started using MultiTracker: open the tracker in every play session. Menus and pauses are not counted.',
       'run.noLog': 'No log.txt yet: open the game to start.',
       'run.following': 'Following run {seed} (slot {slot}).',
       'run.none': 'No run in the log.',
@@ -398,6 +412,13 @@
       'run.description': 'Description du dernier objet',
       'run.transforms': 'Transformations',
       'run.logError': 'Impossible de lire log.txt : {error}',
+      'run.runTime': 'Durée de la partie',
+      'progress.playtime': 'Temps sur cette sauvegarde',
+      'view.playtime': 'Temps ',
+      'time.hm': '{h} h {m} min',
+      'time.m': '{m} min',
+      'save.playtime': '. Temps enregistré : {time}',
+      'save.playtimeNote': 'Le temps de jeu est enregistré depuis que vous utilisez MultiTracker : ouvrez le tracker à chaque session de jeu. Les menus et les pauses ne comptent pas.',
       'run.noLog': 'Pas encore de log.txt : lancez le jeu pour commencer.',
       'run.following': 'Suivi de la partie {seed} (emplacement {slot}).',
       'run.none': 'Aucune partie dans le log.',
@@ -577,6 +598,13 @@
       'run.description': 'Descrição do último item',
       'run.transforms': 'Transformações',
       'run.logError': 'Não é possível ler o log.txt: {error}',
+      'run.runTime': 'Tempo da partida',
+      'progress.playtime': 'Tempo neste arquivo',
+      'view.playtime': 'Tempo ',
+      'time.hm': '{h} h {m} min',
+      'time.m': '{m} min',
+      'save.playtime': '. Tempo registrado: {time}',
+      'save.playtimeNote': 'O tempo de jogo é registrado desde que você usa o MultiTracker: abra o tracker em cada sessão de jogo. Menus e pausas não contam.',
       'run.noLog': 'Ainda não há log.txt: abra o jogo para começar.',
       'run.following': 'Acompanhando a partida {seed} (slot {slot}).',
       'run.none': 'Nenhuma partida no log.',
@@ -756,6 +784,13 @@
       'run.description': 'Описание последнего предмета',
       'run.transforms': 'Трансформации',
       'run.logError': 'Не удаётся прочитать log.txt: {error}',
+      'run.runTime': 'Время забега',
+      'progress.playtime': 'Время в этом сохранении',
+      'view.playtime': 'Время ',
+      'time.hm': '{h} ч {m} мин',
+      'time.m': '{m} мин',
+      'save.playtime': '. Записано времени: {time}',
+      'save.playtimeNote': 'Время игры записывается с начала использования MultiTracker: открывайте трекер в каждой игровой сессии. Меню и паузы не учитываются.',
       'run.noLog': 'Файла log.txt пока нет: запустите игру, чтобы начать.',
       'run.following': 'Отслеживается забег {seed} (слот {slot}).',
       'run.none': 'В логе нет забега.',
@@ -928,5 +963,11 @@
     for (const e of root.querySelectorAll('[data-i18n-placeholder]')) e.placeholder = t(lang, e.dataset.i18nPlaceholder);
   }
 
-  return { LANGUAGES, FALLBACK, STRINGS, resolve, t, apply };
+  // Duración en horas y minutos ("3 h 7 min"), o solo minutos si no llega a una hora.
+  function duration(lang, seconds) {
+    const total = Math.floor((seconds || 0) / 60), h = Math.floor(total / 60), m = total % 60;
+    return h ? t(lang, 'time.hm', { h, m }) : t(lang, 'time.m', { m });
+  }
+
+  return { LANGUAGES, FALLBACK, STRINGS, resolve, t, apply, duration };
 });

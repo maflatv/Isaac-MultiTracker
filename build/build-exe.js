@@ -1,5 +1,5 @@
 // Genera dist/MultiTracker.exe (portable: un solo archivo, sin instalar nada) y el .zip para publicar.
-// Uso: node build/build-exe.js 1.2.0
+// Uso: node build/build-exe.js 1.3.0
 // Solo incluye lo que Git publicaría: lo ignorado (userdata/, la fuente Upheaval...) nunca llega al .exe.
 const fs = require('fs');
 const path = require('path');
@@ -7,7 +7,7 @@ const { execFileSync } = require('child_process');
 const { ROOT, WORK, ELECTRON, installTools, run } = require('./tools.js');
 
 const VERSION = process.argv[2];
-if (!/^\d+\.\d+\.\d+$/.test(VERSION || '')) throw new Error('Indica la versión: node build/build-exe.js 1.2.0');
+if (!/^\d+\.\d+\.\d+$/.test(VERSION || '')) throw new Error('Indica la versión: node build/build-exe.js 1.3.0');
 
 const DIST = path.join(ROOT, 'dist');
 const STAGE = path.join(WORK, 'stage');

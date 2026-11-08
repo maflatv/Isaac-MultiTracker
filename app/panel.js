@@ -10,8 +10,8 @@ const BANNER_HEIGHT = 121;
 const MIN_AUTO_ICON = 24;
 const FLOOR_LABEL_HEIGHT = 14;
 const KOFI = 'https://ko-fi.com/maflatv';
-const RUN_SHOW = ['character', 'seed', 'floor', 'items', 'description', 'transforms'];
-const PROGRESS_SHOW = ['winStreak', 'achievements', 'collection', 'marksHard', 'marksAny', 'challenges'];
+const RUN_SHOW = ['character', 'seed', 'floor', 'runTime', 'items', 'description', 'transforms'];
+const PROGRESS_SHOW = ['winStreak', 'playtime', 'achievements', 'collection', 'marksHard', 'marksAny', 'challenges'];
 // Cada tema parte de la apariencia por defecto y cambia solo lo indicado.
 const THEMES = {
   default: {},
@@ -74,7 +74,8 @@ function toggleInList(list, id, on) {
 function saveLabel(s) {
   const owner = s.account === 'local' ? tr('save.local') : tr('save.account', { account: s.account });
   const prog = s.deadGod ? 'Dead God' : s.achievements ? tr('save.achievements', s.achievements) : tr('save.noData');
-  return `${owner} · ${tr('save.slot', { slot: s.slot })} · ${prog} · ${new Date(s.mtime).toLocaleDateString(lang)}`;
+  const time = s.playtime ? ` · ${I18N.duration(lang, s.playtime)}` : '';
+  return `${owner} · ${tr('save.slot', { slot: s.slot })} · ${prog}${time} · ${new Date(s.mtime).toLocaleDateString(lang)}`;
 }
 
 async function setSaveFile(file) {
@@ -215,7 +216,10 @@ async function refreshStatus() {
   $('saveStatus').className = 'note' + (error ? ' error' : '');
   if (saveFileError) $('saveStatus').textContent = saveFileError;
   else if (src.error) $('saveStatus').textContent = (s.progress ? tr('save.lastValid') : '') + src.error;
-  else $('saveStatus').textContent = tr('save.reading', { file: src.file }) + (s.progress && s.progress.complete ? tr('save.complete') : '');
+  else {
+    const time = s.playtime ? tr('save.playtime', { time: I18N.duration(lang, s.playtime) }) : '';
+    $('saveStatus').textContent = tr('save.reading', { file: src.file }) + time + (s.progress && s.progress.complete ? tr('save.complete') : '');
+  }
   syncObs(s.obs);
 }
 

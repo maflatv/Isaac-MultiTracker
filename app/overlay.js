@@ -69,12 +69,23 @@ function streakTag(p) {
   return tagEl;
 }
 
+// Tiempo jugado en el archivo elegido, desde que se registra. Como la racha, no depende de la partida.
+function playtimeTag(seconds) {
+  const tagEl = el('span', 'streak', tr('view.playtime'));
+  tagEl.append(el('b', '', I18N.duration(lang, seconds)));
+  tagEl.title = tr('progress.playtime');
+  return tagEl;
+}
+
 function whoBlock(s) {
   const w = el('div', 'who'), { show } = s.config, r = s.run;
   if (r && show.character && r.character) w.append(el('strong', '', r.character));
   if (r && show.floor && r.floor) w.append(el('span', '', r.floor));
+  // Se actualiza con cada cambio de sala, que es cuando el juego escribe el contador en el log.
+  if (r && show.runTime && r.seconds) { const t = el('span', '', I18N.duration(lang, r.seconds)); t.title = tr('run.runTime'); w.append(t); }
   if (r && show.seed) w.append(el('code', '', r.seed));
   if (show.winStreak && s.progress) w.append(streakTag(s.progress));
+  if (show.playtime && s.playtime !== null && s.playtime !== undefined) w.append(playtimeTag(s.playtime));
   return w;
 }
 

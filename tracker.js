@@ -4,6 +4,7 @@ const path = require('path');
 const { safeJoin, MIME, send, readBody, writeFile, readJson } = require('./lib/http.js');
 const { readAsset } = require('./lib/runtime.js');
 const { pickFile } = require('./lib/filepicker.js');
+const { activeSteamAccount } = require('./paths.js');
 const { listFonts } = require('./lib/fonts.js');
 const { RunLog } = require('./lib/log.js');
 const { createAchievementIcons } = require('./lib/steamicons.js');
@@ -12,6 +13,9 @@ const { loadGameData, floorLabel, TRANSFORMS, TRANSFORM_GOAL } = require('./lib/
 const { LANGUAGES, resolve: resolveLanguage, t } = require('./app/i18n.js');
 
 const LOG_POLL_MS = 1000;
+// El contador de frames de la partida avanza 30 veces por segundo.
+const GAME_FPS = 30;
+const PLAYTIME_VERSION = 1;
 
 const CUSTOM_SAVE = 'custom';
 const MAX_SAVE_BYTES = 1024 * 1024;
@@ -32,7 +36,7 @@ const DEFAULTS = {
   saveFile: '',
   // Solo en la aplicación de escritorio: servir la vista por http://localhost para la fuente de navegador de OBS.
   obsServer: false,
-  show: { character: true, seed: true, floor: true, items: true, description: false, transforms: true, achievements: true, collection: true, winStreak: true, marksHard: false, marksAny: false, challenges: false },
+  show: { character: true, seed: true, floor: true, runTime: false, items: true, description: false, transforms: true, playtime: false, achievements: true, collection: true, winStreak: true, marksHard: false, marksAny: false, challenges: false },
   goals: [],
   watched: [],
   options: { ...APPEARANCE, layout: 'banner', iconAuto: true, iconSize: 40, rows: 0, maxItems: 0, removed: 'hide', markItem: 'hover', hoverDesc: true, progressStyle: 'icons', pendingLook: 'color', hideDone: false, floorGroups: true, transformsClose: true, highlight: true, highlightSeconds: 5 },
@@ -58,6 +62,8 @@ class UserError extends Error {
 function createTracker({ resDir, gameDir, steamUserdata, dataDir }, options = {}) {
   const CONFIG_FILE = path.join(dataDir, 'config.json');
   const RUNS_FILE = path.join(dataDir, 'cache', 'runs.json');
+  // Fuera de cache/: no se puede volver a calcular, así que no debe borrarse al limpiar la caché.
+  const PLAYTIME_FILE = path.join(dataDir, 'playtime.json');
   const APP_ASSETS = 'app';
   const choosePath = options.pickFile || pickFile;
   const achievementIcons = createAchievementIcons({ steamUserdata, cacheDir: path.join(dataDir, 'cache', 'achievements') });
@@ -115,12 +121,49 @@ function createTracker({ resDir, gameDir, steamUserdata, dataDir }, options = {}
   const gameData = () => (data = data || loadGameData(resDir));
   const saves = () => listSaves(steamUserdata, gameDir);
 
-  const runLog = new RunLog(path.join(gameDir, 'log.txt'), readJson(RUNS_FILE, {}), id => gameData().actives.has(id), id => gameData().quests.has(id));
+  // ---------- Tiempo de juego por archivo ----------
+  // El juego no lo guarda: se suma desde el contador de frames del log. Cada partida guarda su máximo, así que
+  // releer el mismo log no cuenta dos veces, y continuar una partida suma también lo jugado sin el tracker abierto.
+  // Una seed jugada dos veces como partida nueva en el mismo archivo cuenta solo la más larga.
+  const saved = readJson(PLAYTIME_FILE, null);
+  const times = saved && saved.version === PLAYTIME_VERSION && saved.files && typeof saved.files === 'object' ? saved : { version: PLAYTIME_VERSION, files: {} };
+  let timesChanged = false;
+
+  // La ranura viene en el log; la cuenta, de la sesión de Steam abierta o, si no, del guardado de esa ranura modificado más tarde.
+  function saveIdForSlot(slot) {
+    const candidates = saves().filter(s => s.slot === +slot);
+    const active = activeSteamAccount();
+    const s = candidates.find(x => x.account === active) || candidates.sort((a, b) => b.mtime - a.mtime)[0];
+    return s ? s.id : null;
+  }
+  function recordFrames(run) {
+    if (!run.saveId) run.saveId = saveIdForSlot(run.slot);
+    if (!run.saveId) return;
+    const file = times.files[run.saveId] || (times.files[run.saveId] = { runs: {} });
+    const entry = file.runs[run.seed] || (file.runs[run.seed] = { frames: 0 });
+    if (run.frames <= entry.frames) return;
+    entry.frames = run.frames;
+    if (run.character !== null && run.character !== undefined) entry.character = run.character;
+    timesChanged = true;
+  }
+  const secondsOf = saveId => {
+    const file = saveId && times.files[saveId];
+    return file ? Math.round(Object.values(file.runs).reduce((n, r) => n + r.frames, 0) / GAME_FPS) : 0;
+  };
+  // Un archivo elegido a mano cuenta como el guardado de Steam o local que sea, si es uno de ellos.
+  const timeIdOf = (id, file) => {
+    if (!id || !id.startsWith(CUSTOM_SAVE + ':')) return id;
+    const same = saves().find(s => path.resolve(s.file).toLowerCase() === path.resolve(file).toLowerCase());
+    return same ? same.id : null;
+  };
+
+  const runLog = new RunLog(path.join(gameDir, 'log.txt'), readJson(RUNS_FILE, {}), id => gameData().actives.has(id), id => gameData().quests.has(id), recordFrames);
   // missing: el juego aún no ha creado log.txt (por ejemplo, antes de abrirlo por primera vez). No es un fallo.
   const logStatus = { ok: false, missing: false, error: null };
   function pollLog() {
     try {
       if (runLog.poll()) writeFile(RUNS_FILE, JSON.stringify(runLog.snapshot()));
+      if (timesChanged) { writeFile(PLAYTIME_FILE, JSON.stringify(times)); timesChanged = false; }
       logStatus.ok = true; logStatus.missing = false; logStatus.error = null;
     } catch (e) {
       logStatus.ok = false;
@@ -180,7 +223,7 @@ function createTracker({ resDir, gameDir, steamUserdata, dataDir }, options = {}
     }
     const floor = r.floors[r.floors.length - 1];
     return {
-      seed: r.seed, slot: r.slot,
+      seed: r.seed, slot: r.slot, seconds: Math.round((r.frames || 0) / GAME_FPS),
       character: characterName(r.character, lang),
       floor: floor ? floorLabel(floor) : '',
       items,
@@ -195,6 +238,8 @@ function createTracker({ resDir, gameDir, steamUserdata, dataDir }, options = {}
     return {
       lang, desktop: !!options.desktop, obs: options.obsStatus ? options.obsStatus() : null,
       config, run: runView(lang), progress: save.progress,
+      // Segundos jugados en el archivo elegido desde que se registra; null si no es un guardado conocido.
+      playtime: timeIdOf(save.id, save.file) ? secondsOf(timeIdOf(save.id, save.file)) : null,
       sources: { log: logStatus, save: { id: save.id, file: save.file, mtime: save.mtime, error: save.error } },
     };
   }
@@ -207,7 +252,7 @@ function createTracker({ resDir, gameDir, steamUserdata, dataDir }, options = {}
       saves: saves().map(s => {
         let p = null;
         try { p = summarize(parseSave(fs.readFileSync(s.file)), collection); } catch { /* se muestra sin datos */ }
-        return { id: s.id, account: s.account, slot: s.slot, mtime: s.mtime, achievements: p && p.achievements, deadGod: !!(p && p.deadGod) };
+        return { id: s.id, account: s.account, slot: s.slot, mtime: s.mtime, achievements: p && p.achievements, deadGod: !!(p && p.deadGod), playtime: secondsOf(s.id) };
       }),
       goals: COUNTER_GOALS.map(g => ({ id: g.id, name: t(lang, 'goal.' + g.id), goal: g.goal })),
       watched: WATCHED_ACHIEVEMENTS.map(id => ({ id: 's' + id, name: achievementName(id, lang) })),
