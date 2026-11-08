@@ -7,9 +7,13 @@ const { send } = require('./lib/http.js');
 
 const DEFAULT_PORT = 7374;
 
+// Una web cuyo dominio apunte a 127.0.0.1 (DNS rebinding) llega con su propio nombre en Host: se rechaza.
+const LOCAL_HOST = /^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/i;
+
 // Solo escucha en este PC. Llama a onReady(error) cuando el puerto está abierto o no se ha podido abrir.
 function listen(handle, port, onReady = () => {}) {
   const server = http.createServer(async (req, res) => {
+    if (!LOCAL_HOST.test(req.headers.host || '')) return send(res, 403, { error: 'Forbidden host' });
     try {
       const url = new URL(req.url, 'http://localhost');
       await handle(req, res, url, decodeURIComponent(url.pathname));

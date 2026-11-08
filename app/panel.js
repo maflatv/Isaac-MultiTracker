@@ -198,7 +198,9 @@ async function refreshStatus() {
   const s = await fetch('api/state').then(r => r.json());
   const logErr = s.sources.log.error, src = s.sources.save;
   $('logStatus').className = 'note' + (logErr ? ' error' : '');
-  $('logStatus').textContent = logErr ? tr('run.logError', { error: logErr }) : s.run ? tr('run.following', { seed: s.run.seed, slot: s.run.slot }) : tr('run.none');
+  $('logStatus').textContent = logErr ? tr('run.logError', { error: logErr })
+    : s.run ? tr('run.following', { seed: s.run.seed, slot: s.run.slot })
+    : s.sources.log.missing ? tr('run.noLog') : tr('run.none');
   const error = saveFileError || src.error;
   $('saveStatus').className = 'note' + (error ? ' error' : '');
   if (saveFileError) $('saveStatus').textContent = saveFileError;

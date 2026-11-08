@@ -114,13 +114,16 @@ function createTracker({ resDir, gameDir, steamUserdata, dataDir }, options = {}
   const saves = () => listSaves(steamUserdata, gameDir);
 
   const runLog = new RunLog(path.join(gameDir, 'log.txt'), readJson(RUNS_FILE, {}), id => gameData().actives.has(id), id => gameData().quests.has(id));
-  const logStatus = { ok: false, error: null };
+  // missing: el juego aún no ha creado log.txt (por ejemplo, antes de abrirlo por primera vez). No es un fallo.
+  const logStatus = { ok: false, missing: false, error: null };
   function pollLog() {
     try {
       if (runLog.poll()) writeFile(RUNS_FILE, JSON.stringify(runLog.snapshot()));
-      logStatus.ok = true; logStatus.error = null;
+      logStatus.ok = true; logStatus.missing = false; logStatus.error = null;
     } catch (e) {
-      logStatus.ok = false; logStatus.error = String(e.message || e);
+      logStatus.ok = false;
+      logStatus.missing = e.code === 'ENOENT';
+      logStatus.error = logStatus.missing ? null : String(e.message || e);
     }
   }
   // Se sigue el log aunque no haya ninguna vista abierta, para detectar cuándo el juego lo reinicia.
@@ -213,10 +216,11 @@ function createTracker({ resDir, gameDir, steamUserdata, dataDir }, options = {}
   const json = (status, body) => ({ status, type: MIME['.json'], body: JSON.stringify(body) });
   const file = (buf, rel) => (buf ? { status: 200, type: MIME[path.extname(rel).toLowerCase()] || 'application/octet-stream', body: buf } : json(404, { error: 'Not found' }));
 
+  // cache: la vista puede reutilizar la imagen. Un icono que falta no se marca, por si aparece después.
   function icon(rel) {
     const f = rel && safeJoin(resDir, rel);
     if (!f) return json(404, { error: 'No icon' });
-    try { return file(fs.readFileSync(f), f); } catch { return json(404, { error: 'No icon' }); }
+    try { return { ...file(fs.readFileSync(f), f), cache: true }; } catch { return json(404, { error: 'No icon' }); }
   }
 
   // Responde a una petición sin depender de cómo llega: servidor HTTP, Isaac Suite o la ventana de escritorio.
@@ -244,7 +248,7 @@ function createTracker({ resDir, gameDir, steamUserdata, dataDir }, options = {}
     if (method === 'GET' && (m = /^\/icon\/item\/(\d+)\.png$/.exec(pathname))) return icon(gameData().icons.get(+m[1]));
     if (method === 'GET' && (m = /^\/icon\/achievement\/(\d+)\.jpg$/.exec(pathname))) {
       const img = await achievementIcons.get(+m[1]);
-      return img ? { status: 200, type: 'image/jpeg', body: img } : json(404, { error: 'No icon' });
+      return img ? { status: 200, type: 'image/jpeg', body: img, cache: true } : json(404, { error: 'No icon' });
     }
     if (method === 'GET') {
       const rel = pathname === '/' ? 'index.html' : pathname.slice(1);
@@ -257,7 +261,7 @@ function createTracker({ resDir, gameDir, steamUserdata, dataDir }, options = {}
   // Adaptador para un servidor http de Node (server.js e Isaac Suite).
   async function handle(req, res, url, pathname) {
     const r = await respond({ method: req.method, pathname, contentType: req.headers['content-type'], readJsonBody: () => readBody(req) });
-    send(res, r.status, r.body, r.type);
+    send(res, r.status, r.body, r.type, r.cache);
   }
 
   return { respond, handle, config: loadConfig, language: () => languageOf(loadConfig()), T };

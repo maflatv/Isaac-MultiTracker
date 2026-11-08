@@ -4,7 +4,7 @@
 const path = require('path');
 const { app, BrowserWindow, Menu, dialog, protocol, screen, shell } = require('electron');
 const { BASE_DIR, APP_ROOT } = require('../lib/runtime.js');
-const { readJson, writeFile } = require('../lib/http.js');
+const { readJson, writeFile, cacheControl } = require('../lib/http.js');
 const { resolvePaths } = require('../paths.js');
 const { listen, hasResources, DEFAULT_PORT } = require('../server.js');
 const { t, resolve } = require('../app/i18n.js');
@@ -87,7 +87,12 @@ function saveBounds(id, bounds) {
 function openView() {
   if (view) { if (view.isMinimized()) view.restore(); view.focus(); return; }
   view = createWindow({ ...savedBounds('view', VIEW_SIZE), useContentSize: true, minWidth: 200, minHeight: 60 }, 'MultiTracker · Tracker');
-  view.on('close', () => saveBounds('view', view.getContentBounds()));
+  // Con useContentSize, x e y son la posición de la ventana y el ancho y el alto los del contenido.
+  // Guardar la posición del contenido desplazaría la ventana el alto de la barra de título en cada sesión.
+  view.on('close', () => {
+    const { x, y } = view.getBounds(), { width, height } = view.getContentBounds();
+    saveBounds('view', { x, y, width, height });
+  });
   view.on('closed', () => { view = null; });
   view.loadURL(ORIGIN + '/overlay.html');
 }
@@ -124,7 +129,7 @@ async function serve(request) {
     contentType: request.headers.get('content-type'),
     readJsonBody: async () => JSON.parse(await request.text()),
   });
-  return new Response(r.body, { status: r.status, headers: { 'Content-Type': r.type, 'Cache-Control': 'no-store' } });
+  return new Response(r.body, { status: r.status, headers: { 'Content-Type': r.type, 'Cache-Control': cacheControl(r.cache) } });
 }
 
 function start() {
