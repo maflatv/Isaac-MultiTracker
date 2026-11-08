@@ -4,6 +4,7 @@ const path = require('path');
 const { safeJoin, MIME, send, readBody, writeFile, readJson } = require('./lib/http.js');
 const { readAsset } = require('./lib/runtime.js');
 const { pickFile } = require('./lib/filepicker.js');
+const { listFonts } = require('./lib/fonts.js');
 const { RunLog } = require('./lib/log.js');
 const { createAchievementIcons } = require('./lib/steamicons.js');
 const { SaveError, parseSave, summarize, listSaves, COUNTER_GOALS, WATCHED_ACHIEVEMENTS } = require('./lib/save.js');
@@ -34,17 +35,18 @@ const DEFAULTS = {
   show: { character: true, seed: true, floor: true, items: true, description: false, transforms: true, achievements: true, collection: true, winStreak: true, marksHard: false, marksAny: false, challenges: false },
   goals: [],
   watched: [],
-  options: { ...APPEARANCE, layout: 'banner', iconAuto: true, iconSize: 40, rows: 0, maxItems: 0, removed: 'hide', progressStyle: 'icons', pendingLook: 'color', hideDone: false, floorGroups: true, transformsClose: true, highlight: true, highlightSeconds: 5 },
+  options: { ...APPEARANCE, layout: 'banner', iconAuto: true, iconSize: 40, rows: 0, maxItems: 0, removed: 'hide', markItem: 'hover', hoverDesc: true, progressStyle: 'icons', pendingLook: 'color', hideDone: false, floorGroups: true, transformsClose: true, highlight: true, highlightSeconds: 5 },
 };
 const LIMITS = { iconSize: [16, 96], rows: [0, 8], maxItems: [0, 200], highlightSeconds: [2, 20], fontSize: [10, 32], iconGap: [0, 16], rowGap: [0, 24], padding: [0, 32], radius: [0, 24], backgroundOpacity: [0, 100] };
 const CHOICES = {
-  layout: ['banner', 'wide'], removed: ['dim', 'hide'], background: ['transparent', 'solid', 'brick'], textEffect: ['none', 'shadow', 'outline'],
+  layout: ['banner', 'wide'], removed: ['dim', 'hide'], markItem: ['none', 'latest', 'hover'], background: ['transparent', 'solid', 'brick'], textEffect: ['none', 'shadow', 'outline'],
   iconEffect: ['none', 'glow', 'shadow'], progressStyle: ['icons', 'text'], pendingLook: ['color', 'gray'], align: ['left', 'center', 'right'], itemsPosition: ['above', 'below'],
 };
-const FLAGS = ['iconAuto', 'hideDone', 'floorGroups', 'transformsClose', 'bold', 'highlight'];
+const FLAGS = ['iconAuto', 'hideDone', 'floorGroups', 'transformsClose', 'bold', 'highlight', 'hoverDesc'];
 const COLORS = ['color', 'textColor', 'accentColor', 'doneColor', 'blindColor'];
-// El nombre de la fuente acaba en CSS: solo letras, números, espacios y guiones.
-const FONT_NAME = /^[\p{L}\p{N} _-]{1,40}$/u;
+// El nombre de la fuente acaba en CSS entre comillas dobles: se admiten los caracteres de los nombres de fuentes
+// instaladas (letras, números, espacios, guiones, puntos, paréntesis, &, + y apóstrofos), nunca comillas dobles ni barras.
+const FONT_NAME = /^[\p{L}\p{N} _\-.&+'()]{1,60}$/u;
 
 // Error causado por lo que eligió el usuario: su mensaje (clave de app/i18n.js) se le muestra traducido en el panel.
 class UserError extends Error {
@@ -228,6 +230,7 @@ function createTracker({ resDir, gameDir, steamUserdata, dataDir }, options = {}
   async function respond({ method, pathname, contentType, readJsonBody }) {
     if (method === 'GET' && pathname === '/api/state') return json(200, state());
     if (method === 'GET' && pathname === '/api/choices') return json(200, choices());
+    if (method === 'GET' && pathname === '/api/fonts') return json(200, { fonts: await listFonts() });
     // Exigir JSON impide que una página web cualquiera lance estas acciones contra el servidor local.
     if (method === 'POST' && !String(contentType).startsWith('application/json')) return json(415, { error: 'Expected JSON' });
     if (method === 'POST' && pathname === '/api/config') {

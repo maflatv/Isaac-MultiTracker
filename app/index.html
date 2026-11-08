@@ -60,8 +60,12 @@
         <label><span data-i18n="items.removed"></span>
           <select data-option="removed"><option value="dim" data-i18n="items.dim"></option><option value="hide" data-i18n="items.hide"></option></select>
         </label>
+        <label><span data-i18n="items.mark"></span>
+          <select data-option="markItem"><option value="none" data-i18n="items.markNone"></option><option value="latest" data-i18n="items.markLatest"></option><option value="hover" data-i18n="items.markHover"></option></select>
+        </label>
       </div>
       <div class="checks">
+        <label><input type="checkbox" data-option="hoverDesc"> <span data-i18n="items.hoverDesc"></span></label>
         <label><input type="checkbox" data-option="hideDone"> <span data-i18n="items.hideDone"></span></label>
         <label><input type="checkbox" data-option="floorGroups"> <span data-i18n="items.floorGroups"></span></label>
         <label><input type="checkbox" data-option="transformsClose"> <span data-i18n="items.transformsClose"></span></label>
@@ -84,7 +88,7 @@
       </div>
       <h3 data-i18n="look.text"></h3>
       <div class="fields">
-        <label><span data-i18n="look.font"></span> <input data-option="font" list="fonts" maxlength="40" spellcheck="false"></label>
+        <label><span data-i18n="look.font"></span> <input data-option="font" list="fonts" maxlength="60" spellcheck="false" autocomplete="off"></label>
         <datalist id="fonts">
           <option value="Upheaval"><option value="Segoe UI"><option value="Arial"><option value="Bahnschrift"><option value="Consolas"><option value="Georgia"><option value="Impact"><option value="Trebuchet MS"><option value="Verdana"><option value="Comic Sans MS">
         </datalist>
@@ -149,7 +153,7 @@
   <p data-i18n="about.lead"></p>
   <h3 data-i18n="about.credits"></h3>
   <dl>
-    <dt><a href="https://github.com/maflatv/MultiTracker" target="_blank" rel="noopener">MultiTracker</a></dt>
+    <dt><a href="https://github.com/maflatv/Isaac-MultiTracker" target="_blank" rel="noopener">MultiTracker</a></dt>
     <dd><strong>Mafla</strong>. <span data-i18n="about.creator"></span></dd>
     <dt><a href="https://github.com/Hyphen-ated/RebirthItemTracker" target="_blank" rel="noopener">Rebirth Item Tracker</a></dt>
     <dd><strong>Brett824 <span data-i18n="about.and"></span> Hyphen-ated</strong>. <span data-i18n="about.rit"></span></dd>

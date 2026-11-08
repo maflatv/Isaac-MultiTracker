@@ -72,8 +72,13 @@ body.highlighting #view { opacity: 0; }
 .owner-badge { position: absolute; left: 1px; bottom: 1px; width: 13px; height: 13px; border-radius: 3px; color: #000; font: 700 10px/13px system-ui, sans-serif; text-align: center; text-shadow: none; }
 .owner-badge.jacob { background: #6cc4ff; }
 .owner-badge.esau { background: #ff8a6c; }
-.item.latest { box-shadow: inset 0 0 0 2px var(--accent); }
-.item.fresh { animation: fresh-pulse .7s ease-out 2; }
+/* Marca opcional: el último objeto tomado o el que está bajo el puntero */
+.mark-latest .item.latest, .mark-hover .item:not(.more):hover { box-shadow: inset 0 0 0 2px var(--accent); }
+.mark-latest .item.fresh { animation: fresh-pulse .7s ease-out 2; }
+/* Descripción del objeto bajo el puntero: flota sobre la vista para no cambiar el tamaño de los iconos */
+#tip { position: absolute; left: 0; right: 0; bottom: 0; z-index: 1; padding: 3px var(--padding); background: rgba(0, 0, 0, .82); font-size: var(--small); font-weight: 400; line-height: 1.25; text-align: left; pointer-events: none; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+#tip.top { top: 0; bottom: auto; }
+#tip strong { font-weight: 600; color: var(--accent); }
 .item.more { color: var(--accent); font-size: var(--label); font-weight: 600; }
 .waiting { opacity: .7; font-size: var(--small); font-weight: 400; }
 .hero-blind { color: var(--blind); }

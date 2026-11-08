@@ -13,7 +13,7 @@ Solo lee archivos del juego: no modifica tus partidas ni necesita mods.
 
 ## Instalación
 
-1. Descarga `MultiTracker.exe` de la [última versión](https://github.com/maflatv/MultiTracker/releases/latest) y ponlo en su propia carpeta. Tus ajustes se guardarán ahí. Hay también un `.zip` con el mismo `.exe` y las licencias.
+1. Descarga `MultiTracker.exe` de la [última versión](https://github.com/maflatv/Isaac-MultiTracker/releases/latest) y ponlo en su propia carpeta. Tus ajustes se guardarán ahí. Hay también un `.zip` con el mismo `.exe` y las licencias.
 2. Ejecuta una vez `tools\ResourceExtractor\ResourceExtractor.exe`, en la carpeta del juego en Steam. MultiTracker toma de ahí los iconos, los nombres y sus traducciones, porque no incluye ningún archivo del juego.
 3. Abre `MultiTracker.exe`. Es portable: no se instala ni abre ningún servidor.
 4. Elige tu guardado y tu idioma en el panel.
@@ -39,7 +39,7 @@ Requiere [Node.js](https://nodejs.org) 24. Las herramientas de compilación (Ele
 
 - **Aplicación de escritorio:** `node build/run-desktop.js`.
 - **Sin Electron:** `iniciar.bat` sirve el panel en http://localhost:7374 con Node, y `ventana.bat` abre el tracker en una ventana de Microsoft Edge.
-- **Generar el ejecutable:** `node build/build-exe.js 1.1.1` crea `MultiTracker.exe` y el `.zip` en `dist/`. Solo incluye archivos que Git publicaría: lo ignorado nunca llega al `.exe`.
+- **Generar el ejecutable:** `node build/build-exe.js 1.2.0` crea `MultiTracker.exe` y el `.zip` en `dist/`. Solo incluye archivos que Git publicaría: lo ignorado nunca llega al `.exe`.
 
 ## Qué muestra
 
@@ -47,6 +47,8 @@ Requiere [Node.js](https://nodejs.org) 24. Las herramientas de compilación (Ele
 - **Solo lo que el personaje posee:** los rerolls (D4, D100, sala de dados...) y Genesis quitan lo perdido.
 - **Jacob y Esaú:** cada objeto indica quién lo lleva.
 - **Objeto recién tomado:** se destaca con una animación durante unos segundos.
+- **Descripción al pasar el puntero:** en la ventana del tracker, el objeto bajo el puntero se marca y su nombre, descripción y piso aparecen en una franja. En el panel puedes elegir qué objeto se marca: el que está bajo el puntero, el último tomado o ninguno.
+- **Cualquier fuente instalada:** el campo **Fuente** del panel sugiere las fuentes instaladas en tu PC.
 - **Progreso hacia Dead God:** logros, colección, marcas, retos y racha actual. En un guardado al 100% solo se muestra la racha.
 - **Logros como iconos:** los contadores y los logros vigilados se muestran con los iconos de sus logros de Steam, con una ✓ en los conseguidos. MultiTracker sabe qué icono corresponde a cada logro por el esquema que Steam guarda en tu PC (`appcache/stats`), descarga cada imagen una vez de la CDN de Steam y la guarda en `userdata/cache/achievements/`. Sin conexión, o eligiendo **Texto y barras** en el panel, se muestran con texto.
 
@@ -68,7 +70,7 @@ El archivo debe estar junto a `MultiTracker.exe`. Tus ajustes se guardan en `use
 
 El tracker está pensado para la fuente pixel Upheaval TT (BRK), que no se incluye porque no pudimos confirmar si su licencia permite redistribuirla. Sin ella, se usa la fuente del sistema.
 
-Para usarla, consíguela por tu cuenta y guárdala como `app/upheaval.ttf`, en la carpeta de `MultiTracker.exe`.
+Para usarla, consíguela por tu cuenta e instálala en Windows; después elige **Upheaval TT (BRK)** en el campo **Fuente** del panel. También puedes guardarla como `app/upheaval.ttf`, en la carpeta de `MultiTracker.exe`, y elegir **Upheaval**.
 
 ## Créditos
 

@@ -227,9 +227,14 @@ setInterval(() => {
   showSidePage();
 }, PAGE_MS);
 
-function itemTile(i, latest) {
+// Texto del objeto: nombre, descripción, piso y maldición del ciego.
+const itemInfo = i => `${i.desc ? ' — ' + i.desc : ''}${i.floorLabel ? ' (' + i.floorLabel + ')' : ''}${i.blind ? ' — ' + tr('view.blind') : ''}`;
+
+function itemTile(i, latest, hoverDesc) {
   const t = el('div', 'item' + (i.removed ? ' removed' : '') + (i.blind ? ' blind' : '') + (latest ? ' latest' : ''));
-  t.title = `${i.name}${i.desc ? ' — ' + i.desc : ''}${i.floorLabel ? ' (' + i.floorLabel + ')' : ''}${i.blind ? ' — ' + tr('view.blind') : ''}`;
+  // Con la descripción al pasar el puntero, el recuadro del navegador la repetiría con retraso.
+  if (hoverDesc) t.tipItem = i;
+  else t.title = i.name + itemInfo(i);
   const img = el('img');
   img.src = `icon/item/${i.id}.png`;
   img.alt = i.name;
@@ -238,7 +243,7 @@ function itemTile(i, latest) {
   t.append(img);
   const owner = OWNERS[i.owner];
   if (owner) {
-    t.title += ' — ' + tr(owner.key);
+    if (t.title) t.title += ' — ' + tr(owner.key);
     t.append(el('span', 'owner-badge ' + i.owner, owner.letter));
   }
   return t;
@@ -263,7 +268,7 @@ function shelfRow(s) {
   if (options.maxItems) items = items.slice(-options.maxItems);
   let floor = null;
   for (const i of items) {
-    const tile = itemTile(i, i === latest);
+    const tile = itemTile(i, i === latest, options.hoverDesc);
     if (options.floorGroups) {
       tile.dataset.floor = i.floor;
       if (i.floor !== floor) tile.prepend(floorMark(i));
@@ -305,12 +310,13 @@ const TEXT_SCALE = {
   regular: { '--small': '.85em', '--large': '1.15em', '--label': '12px', '--floor-h': '14px', '--hero-title': 'clamp(1.3em, 14vh, 2.4em)', '--hero-desc': '1em' },
   pixel: { '--small': '15px', '--large': '1em', '--label': '15px', '--floor-h': '14px', '--hero-title': '30px', '--hero-desc': '15px' },
 };
-const PIXEL_FONTS = ['Upheaval'];
+// Upheaval vale tanto incluida en app/ ("Upheaval") como instalada en Windows ("Upheaval TT (BRK)").
+const PIXEL_FONTS = /^Upheaval\b/i;
 
 function applyStyle(o) {
   const icon = { none: 'none', glow: `drop-shadow(0 0 3px ${o.accentColor})`, shadow: 'drop-shadow(1px 2px 1px #000)' };
   const vars = {
-    ...TEXT_SCALE[PIXEL_FONTS.includes(o.font) ? 'pixel' : 'regular'],
+    ...TEXT_SCALE[PIXEL_FONTS.test(o.font) ? 'pixel' : 'regular'],
     '--font': `"${o.font}", system-ui, sans-serif`, '--size': o.fontSize + 'px', '--weight': o.bold ? 600 : 400,
     '--text': o.textColor, '--accent': o.accentColor, '--done': o.doneColor, '--text-shadow': TEXT_EFFECTS[o.textEffect], '--blind': o.blindColor,
     // Iconos de logros proporcionales al texto: 28 px con el tamaño por defecto (20).
@@ -327,6 +333,9 @@ function applyStyle(o) {
 function render(s) {
   const { show, options } = s.config;
   applyStyle(options);
+  document.body.classList.toggle('mark-latest', options.markItem === 'latest');
+  document.body.classList.toggle('mark-hover', options.markItem === 'hover');
+  if (!options.hoverDesc) hideTip();
   const banner = options.layout === 'banner';
   view.className = banner ? 'banner' : 'wide';
   const head = banner ? sideColumn(s) : stripRow(s);
@@ -469,6 +478,25 @@ async function tick() {
 }
 
 window.addEventListener('resize', () => { if (current) render(current); });
+
+// ---------- Descripción del objeto bajo el puntero ----------
+// La vista se redibuja con cada lectura: la franja se actualiza con el objeto que haya ahora bajo el puntero.
+const tip = document.getElementById('tip');
+function hideTip() { tip.hidden = true; }
+function showTip(tile) {
+  const i = tile.tipItem;
+  tip.replaceChildren(el('strong', '', i.name), itemInfo(i));
+  if (OWNERS[i.owner]) tip.append(' — ' + tr(OWNERS[i.owner].key));
+  tip.classList.remove('top');
+  tip.hidden = false;
+  // Abajo, salvo que tape el propio objeto: entonces va arriba.
+  if (tile.getBoundingClientRect().bottom > window.innerHeight - tip.offsetHeight) tip.classList.add('top');
+}
+view.addEventListener('mouseover', e => {
+  const tile = e.target.closest('.item');
+  if (tile && tile.tipItem) showTip(tile); else hideTip();
+});
+view.addEventListener('mouseleave', hideTip);
 
 // Los nombres de contadores y logros dependen del idioma: se vuelven a pedir cuando cambia.
 async function loadNames() {

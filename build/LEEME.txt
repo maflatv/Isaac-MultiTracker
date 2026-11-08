@@ -1,5 +1,5 @@
 MultiTracker, por Mafla
-https://github.com/maflatv/MultiTracker
+https://github.com/maflatv/Isaac-MultiTracker
 
 ANTES DE EMPEZAR / BEFORE YOU START
 Pon MultiTracker.exe en su propia carpeta: tus ajustes se guardarán junto a él.

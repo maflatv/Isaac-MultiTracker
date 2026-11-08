@@ -151,6 +151,16 @@ function initThemes(appearance) {
   });
 }
 
+// Las fuentes instaladas en el PC se añaden a las sugeridas. Windows tarda un momento en listarlas: no se espera.
+async function initFonts() {
+  const list = $('fonts');
+  const known = new Set([...list.options].map(o => o.value));
+  try {
+    const { fonts } = await fetch('api/fonts').then(r => r.json());
+    for (const name of fonts) if (!known.has(name)) list.append(new Option(name, name));
+  } catch { /* se quedan las sugeridas */ }
+}
+
 // Cambiar de idioma recarga el panel: así todos los textos, también los que vienen del servidor, salen ya traducidos.
 function initLanguage(languages) {
   const select = $('language');
@@ -232,6 +242,7 @@ async function init() {
   syncIconControls();
   initThemes(choices.appearance);
   initObs();
+  initFonts();
 
   $('testHighlight').addEventListener('click', () => $('preview').contentWindow.testHighlight());
   $('link').textContent = obsUrl;
