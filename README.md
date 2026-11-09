@@ -47,7 +47,7 @@ Requiere [Node.js](https://nodejs.org) 24. Las herramientas de compilación (Ele
 
 - **Aplicación de escritorio:** `node build/run-desktop.js`.
 - **Sin Electron:** `iniciar.bat` sirve el panel en http://localhost:7374 con Node, y `ventana.bat` abre el tracker en una ventana de Microsoft Edge.
-- **Generar el ejecutable:** `node build/build-exe.js 1.4.0` crea `MultiTracker.exe` y el `.zip` en `dist/`. Solo incluye archivos que Git publicaría: lo ignorado nunca llega al `.exe`.
+- **Generar el ejecutable:** `node build/build-exe.js 1.5.0` crea `MultiTracker.exe` y el `.zip` en `dist/`. Solo incluye archivos que Git publicaría: lo ignorado nunca llega al `.exe`.
 
 ## Qué muestra
 
