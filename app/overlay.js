@@ -50,6 +50,9 @@ const TINY_ICON_SIZES = [20, 16];
 // El banner usa el mayor tamaño que quepa, para aprovechar todo el espacio.
 const BANNER_ICON_SIZES = [96, 80, 64, 56, 48, 40, ...FIT_ICON_SIZES];
 
+// Perfil de esta vista (?profile= en la dirección): la ventana del tracker, la fuente de OBS o la vista previa del panel.
+const PROFILE = new URLSearchParams(location.search).get('profile');
+const STATE_URL = 'api/state' + (PROFILE ? '?profile=' + encodeURIComponent(PROFILE) : '');
 const view = document.getElementById('view');
 const hero = document.getElementById('hero');
 let names = { goals: {}, watched: {} };
@@ -272,8 +275,12 @@ setInterval(() => {
 // Texto del objeto: nombre, descripción, piso y maldición del ciego.
 const itemInfo = i => `${i.desc ? ' — ' + i.desc : ''}${i.floorLabel ? ' (' + i.floorLabel + ')' : ''}${i.blind ? ' — ' + tr('view.blind') : ''}`;
 
-function itemTile(i, latest, hoverDesc) {
+// idx: posición del objeto en la partida, para encontrar su icono (estilos «vuelo», «foco» y «pulso»).
+function itemTile(i, latest, hoverDesc, idx) {
   const t = el('div', 'item' + (i.removed ? ' removed' : '') + (i.blind ? ' blind' : '') + (latest ? ' latest' : ''));
+  t.dataset.idx = idx;
+  // La vista se redibuja con cada lectura: el pulso sigue en el icono nuevo mientras dure.
+  if (pulse && pulse.idx === idx && Date.now() < pulse.until) t.classList.add('pulse');
   // Con la descripción al pasar el puntero, el recuadro del navegador la repetiría con retraso.
   if (hoverDesc) t.tipItem = i;
   else t.title = i.name + itemInfo(i);
@@ -308,6 +315,7 @@ function shelfRow(s) {
   const { options } = s.config, wrap = el('div', 'shelf' + (options.floorGroups ? ' floors' : ''));
   let items = s.run.items;
   const latest = lastTaken(items);
+  const index = new Map(items.map((x, n) => [x, n]));
   if (options.removed === 'hide') items = items.filter(i => !i.removed);
   if (options.maxItems) items = items.slice(-options.maxItems);
   // Si la maldición del ciego se quita a mitad de piso (Black Candle, Genesis), el piso se parte en dos tramos:
@@ -315,7 +323,7 @@ function shelfRow(s) {
   const groupOf = i => i.floor + (i.blind && options.blindMark !== 'none' ? '?' : '');
   let group = null;
   for (const i of items) {
-    const tile = itemTile(i, i === latest, options.hoverDesc);
+    const tile = itemTile(i, i === latest, options.hoverDesc, index.get(i));
     if (options.floorGroups) {
       tile.dataset.floor = groupOf(i);
       if (groupOf(i) !== group) tile.prepend(floorMark(i));
@@ -413,6 +421,9 @@ const WHO_SHADOW = {
   glow: o => `0 0 ${o.whoOutlineSize}px ${o.whoOutlineColor}, 0 0 ${o.whoOutlineSize * 3}px ${o.whoOutlineColor}`,
 };
 
+// Tamaño de la insignia de dueño respecto al icono del objeto.
+const BADGE_SCALE = { small: 0.3, medium: 0.45, large: 0.6 };
+
 function applyStyle(o) {
   const icon = { none: 'none', glow: `drop-shadow(0 0 3px ${o.accentColor})`, shadow: 'drop-shadow(1px 2px 1px #000)' };
   const vars = {
@@ -427,6 +438,9 @@ function applyStyle(o) {
     '--bg': o.background === 'solid' ? o.color : o.background === 'brick' ? 'url(ladrillo.png)' : 'transparent',
     '--bg-opacity': o.backgroundOpacity / 100,
     '--who-shadow': (WHO_SHADOW[o.whoOutline] || WHO_SHADOW.none)(o),
+    '--badge-scale': BADGE_SCALE[o.ownerBadgeSize] || BADGE_SCALE.medium,
+    // Columna lateral del banner: sin valor, el ancho automático de overlay.css.
+    '--side-w': o.sideAuto ? '' : o.sideWidth + 'px',
     ...bgImageVars(o),
   };
   for (const [k, v] of Object.entries(vars)) document.documentElement.style.setProperty(k, v);
@@ -438,6 +452,8 @@ function render(s) {
   document.body.classList.toggle('mark-latest', options.markItem === 'latest');
   document.body.classList.toggle('mark-hover', options.markItem === 'hover');
   document.body.classList.toggle('who-highlight', options.whoOutline !== 'none');
+  document.body.classList.toggle('owner-bg', !!options.ownerBadgeBg);
+  document.body.dataset.badgeCorner = options.ownerBadgeCorner || 'bl';
   // Maldición del ciego: por defecto solo en el separador del piso. Sin separadores, se marca cada objeto para no perder el dato.
   const blind = options.blindMark === 'floor' && !options.floorGroups ? 'items' : options.blindMark;
   document.body.classList.toggle('blind-items', blind === 'items');
@@ -529,66 +545,200 @@ function detectPickups(s) {
     seen.seed = seed;
     seen.since = Date.now();
   } else if (items.length > seen.count && s.config.options.highlight && Date.now() - seen.since > NEW_RUN_GRACE_MS) {
-    const fresh = items.slice(seen.count).filter(i => !i.removed && !i.soul && !i.granted);
+    const fresh = items.slice(seen.count).filter(i => !i.removed && !i.soul && !i.granted).map(i => ({ ...i, idx: items.indexOf(i) }));
     queue.push(...(fresh.length > MAX_BATCH ? fresh.slice(-1) : fresh));
     playNext();
   }
   seen.count = items.length;
 }
 
-// seconds es el tiempo total en pantalla: incluye la entrada y la salida.
-function buildHero(item, seconds) {
-  const icon = el('div', 'hero-icon'), img = el('img');
-  img.src = `icon/item/${item.id}.png`;
-  img.alt = '';
-  img.onerror = () => img.remove();
-  icon.append(el('div', 'hero-rays'), img);
+// Icono del objeto en la estantería, si se ve.
+const findTile = item => (Number.isInteger(item.idx) && item.idx >= 0 ? view.querySelector(`.item[data-idx="${item.idx}"]`) : null);
+const reducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+// Duración del vuelo hasta el hueco del objeto, incluida en los segundos configurados.
+const FLY_MS = 750;
+// Pulso del estilo «Solo pulso»: { idx, until }.
+let pulse = null;
+
+// Tras destacarlo, el icono del objeto late una vez en su sitio.
+function landOn(item) {
+  const tile = findTile(item) || view.querySelector('.item.latest');
+  if (!tile) return;
+  tile.classList.remove('landed');
+  void tile.offsetWidth;
+  tile.classList.add('landed');
+}
+
+function heroCaption(item) {
   const text = el('div', 'hero-text');
   text.append(el('small', '', item.floorLabel ? `${tr('view.newItem')} · ${item.floorLabel}` : tr('view.newItem')));
   if (OWNERS[item.owner]) text.firstChild.append(` · ${tr(OWNERS[item.owner].key)}`);
   if (item.blind) text.firstChild.append(el('span', 'hero-blind', ' · ' + tr('view.blind')));
   text.append(el('strong', '', item.name));
   if (item.desc) text.append(el('p', '', item.desc));
+  return text;
+}
+
+function itemImage(item, className) {
+  const img = el('img', className);
+  img.src = `icon/item/${item.id}.png`;
+  img.alt = '';
+  img.onerror = () => { img.style.visibility = 'hidden'; };
+  return img;
+}
+
+// Hace salir un elemento con su clase «leaving» al final de los segundos y luego llama a end().
+function leaveAfter(node, seconds, end) {
+  setTimeout(() => {
+    node.classList.add('leaving');
+    setTimeout(end, LEAVE_MS);
+  }, seconds * 1000 - LEAVE_MS);
+}
+
+// seconds es el tiempo total en pantalla: incluye la entrada y la salida.
+function buildHero(item, seconds, style) {
+  const icon = el('div', 'hero-icon');
+  icon.append(el('div', 'hero-rays'), itemImage(item));
   const timer = el('div', 'hero-timer');
   timer.style.animationDelay = INTRO_MS + 'ms';
   timer.style.animationDuration = seconds * 1000 - INTRO_MS - LEAVE_MS + 'ms';
-  hero.replaceChildren(icon, text, timer);
+  hero.className = style;
+  hero.replaceChildren(icon, heroCaption(item), timer);
+  hero.hidden = false;
 }
+
+// Cada estilo muestra el objeto durante seconds y llama a done() al terminar.
+const HIGHLIGHT = {
+  // Toda la vista: el objeto con sus rayos, su nombre y su descripción.
+  full(item, seconds, done) {
+    buildHero(item, seconds, 'full');
+    document.body.classList.add('highlighting');
+    leaveAfter(hero, seconds, () => {
+      hero.hidden = true;
+      if (!queue.length) {
+        document.body.classList.remove('highlighting');
+        const tile = view.querySelector('.item.latest');
+        if (tile) tile.classList.add('fresh');
+      }
+      done();
+    });
+  },
+  // Un aviso compacto en una esquina: el resto de la vista sigue a la vista.
+  toast(item, seconds, done) {
+    buildHero(item, seconds, 'toast');
+    leaveAfter(hero, seconds, () => { hero.hidden = true; landOn(item); done(); });
+  },
+  // Una cinta cruza la parte de abajo con el icono, el nombre y la descripción.
+  ticker(item, seconds, done) {
+    const track = el('div', 'ticker-track');
+    const text = heroCaption(item);
+    track.append(itemImage(item), ...text.childNodes);
+    track.style.animationDuration = seconds * 1000 - LEAVE_MS + 'ms';
+    hero.className = 'ticker';
+    hero.replaceChildren(track);
+    hero.hidden = false;
+    leaveAfter(hero, seconds, () => { hero.hidden = true; landOn(item); done(); });
+  },
+  // Solo late su icono en la estantería.
+  pulse(item, seconds, done) {
+    pulse = { idx: item.idx, until: Date.now() + seconds * 1000 };
+    const tile = findTile(item);
+    if (tile) tile.classList.add('pulse');
+    setTimeout(() => {
+      pulse = null;
+      for (const t of view.querySelectorAll('.item.pulse')) t.classList.remove('pulse');
+      done();
+    }, seconds * 1000);
+  },
+  // Se oscurece todo menos el objeto, que se agranda en su sitio con su nombre al lado.
+  spotlight(item, seconds, done) {
+    const r = findTile(item).getBoundingClientRect();
+    const W = window.innerWidth, H = window.innerHeight;
+    const size = Math.max(r.width, Math.min(r.width * 2, H * 0.8, 160));
+    const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+    const left = Math.min(Math.max(cx - size / 2, 0), W - size), top = Math.min(Math.max(cy - size / 2, 0), H - size);
+    const spot = el('div', 'spot');
+    spot.style.setProperty('--sx', cx + 'px');
+    spot.style.setProperty('--sy', cy + 'px');
+    spot.style.setProperty('--sr', size * 0.62 + 'px');
+    const img = itemImage(item, 'spot-icon');
+    Object.assign(img.style, { left: left + 'px', top: top + 'px', width: size + 'px', height: size + 'px' });
+    const text = heroCaption(item);
+    text.className = 'spot-text';
+    // El texto va al lado con más sitio, centrado en vertical con el objeto.
+    if (cx < W * 0.6) text.style.left = left + size + 10 + 'px';
+    else { text.style.right = W - left + 10 + 'px'; text.style.textAlign = 'right'; }
+    text.style.top = top + size / 2 + 'px';
+    spot.append(img, text);
+    document.getElementById('bar').append(spot);
+    leaveAfter(spot, seconds, () => { spot.remove(); landOn(item); done(); });
+  },
+  // El objeto aparece grande en el centro con su nombre y después vuela hasta su hueco en la estantería.
+  fly(item, seconds, done) {
+    const layer = el('div', 'fly');
+    const W = window.innerWidth, H = window.innerHeight;
+    const size = Math.min(H * 0.7, 128);
+    const img = itemImage(item, 'fly-icon');
+    const text = heroCaption(item);
+    text.className = 'fly-text';
+    const row = el('div', 'fly-row');
+    row.append(img, text);
+    img.style.width = img.style.height = size + 'px';
+    layer.append(row);
+    document.getElementById('bar').append(layer);
+    document.body.classList.add('flying');
+    setTimeout(() => {
+      const tile = findTile(item);
+      layer.classList.add('leaving');
+      document.body.classList.remove('flying');
+      if (!tile) return setTimeout(() => { layer.remove(); done(); }, LEAVE_MS);
+      const to = tile.getBoundingClientRect(), from = img.getBoundingClientRect();
+      const dx = to.left + to.width / 2 - (from.left + from.width / 2), dy = to.top + to.height / 2 - (from.top + from.height / 2);
+      const flight = img.animate([{ transform: 'none' }, { transform: `translate(${dx}px, ${dy}px) scale(${to.width / from.width})` }],
+        { duration: FLY_MS, easing: 'cubic-bezier(.55, 0, .45, 1)', fill: 'forwards' });
+      flight.onfinish = () => { layer.remove(); landOn(item); done(); };
+    }, Math.max(1000, seconds * 1000 - FLY_MS));
+  },
+};
+// Estilos que necesitan ver el icono del objeto en la estantería: sin él, se usa el aviso.
+const NEEDS_TILE = ['spotlight', 'fly', 'pulse'];
+// Con «reducir movimiento» en Windows, nada vuela ni se desplaza.
+const MOVING = ['fly', 'ticker'];
 
 function playNext() {
   if (heroActive || !queue.length) return;
   const item = queue.shift();
-  const configured = current ? current.config.options.highlightSeconds : 5;
+  const o = current ? current.config.options : {};
+  const configured = o.highlightSeconds || 5;
   const seconds = queue.length ? Math.min(QUEUED_SECONDS, configured) : configured;
+  let style = HIGHLIGHT[o.highlightStyle] ? o.highlightStyle : 'full';
+  if ((NEEDS_TILE.includes(style) && !findTile(item)) || (MOVING.includes(style) && reducedMotion())) style = 'toast';
   heroActive = true;
-  buildHero(item, seconds);
-  hero.classList.remove('leaving');
-  hero.hidden = false;
-  document.body.classList.add('highlighting');
-  setTimeout(() => {
-    hero.classList.add('leaving');
-    setTimeout(() => {
-      hero.hidden = true;
-      heroActive = false;
-      if (queue.length) return playNext();
-      document.body.classList.remove('highlighting');
-      const tile = view.querySelector('.item.latest');
-      if (tile) tile.classList.add('fresh');
-    }, LEAVE_MS);
-  }, seconds * 1000 - LEAVE_MS);
+  HIGHLIGHT[style](item, seconds, () => {
+    heroActive = false;
+    playNext();
+  });
+}
+
+// Para el panel: muestra unos ajustes aún sin guardar, mientras se arrastra un deslizador o se elige un color.
+// La siguiente lectura con cambios (el guardado al soltar) los sustituye por los guardados.
+function previewConfig(config) {
+  if (current) render({ ...current, config });
 }
 
 // Para el botón de prueba del panel.
 function testHighlight() {
-  const items = current && current.run ? current.run.items.filter(i => !i.removed) : [];
-  const item = items[items.length - 1] || { id: 1, name: 'The Sad Onion', desc: 'Tears +0.7', floorLabel: '' };
+  const items = current && current.run ? current.run.items : [];
+  let idx = items.length - 1;
+  while (idx >= 0 && items[idx].removed) idx--;
+  const item = idx >= 0 ? { ...items[idx], idx } : { id: 1, name: 'The Sad Onion', desc: 'Tears +0.7', floorLabel: '', idx: -1 };
   queue.push(item);
   playNext();
 }
 
 // También lo llama el panel, para que la vista previa responda sin esperar a la siguiente lectura.
 async function refresh() {
-  const text = await fetch('api/state').then(r => r.text());
+  const text = await fetch(STATE_URL).then(r => r.text());
   if (text === lastState) return;
   lastState = text;
   current = JSON.parse(text);

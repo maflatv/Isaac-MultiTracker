@@ -28,7 +28,12 @@ const APPEARANCE = {
   textColor: '#f0e4d8', accentColor: '#f0ad4e', doneColor: '#8fd18f',
   blindColor: '#c77dff',
   iconGap: 2, iconEffect: 'none',
+  // Cabeza de quien lleva el objeto (Jacob y Esaú, Tainted Lazarus): sobre un círculo de su color o sola, su tamaño
+  // respecto al icono y la esquina donde va (bl, br, tl, tr: abajo/arriba e izquierda/derecha).
+  ownerBadgeBg: false, ownerBadgeSize: 'medium', ownerBadgeCorner: 'bl',
   rowGap: 6, padding: 8, radius: 0, align: 'left', itemsPosition: 'below',
+  // Ancho de la columna lateral del banner: automático (según su contenido) o fijo.
+  sideAuto: true, sideWidth: 180,
   background: 'transparent', color: '#1d1714', backgroundOpacity: 100,
 };
 const DEFAULTS = {
@@ -38,11 +43,18 @@ const DEFAULTS = {
   saveFile: '',
   // Solo en la aplicación de escritorio: servir la vista por http://localhost para la fuente de navegador de OBS.
   obsServer: false,
+  // Perfil que usa la ventana del tracker y el del enlace para OBS ('main' es la configuración principal).
+  windowProfile: 'main', obsProfile: 'main',
+  // Temas guardados por el usuario: [{ id, name, options }], comunes a todos los perfiles.
+  themes: [],
   show: { character: true, seed: true, floor: true, runTime: false, items: true, description: false, transforms: true, playtime: false, achievements: true, collection: true, winStreak: true, marksHard: false, marksAny: false, challenges: false },
   goals: [],
   watched: [],
   options: {
     ...APPEARANCE, layout: 'banner', iconAuto: true, iconSize: 40, rows: 0, maxItems: 0, removed: 'hide', markItem: 'hover', hoverDesc: true, progressStyle: 'icons', pendingLook: 'color', hideDone: false, floorGroups: true, transformsClose: true, highlight: true, highlightSeconds: 5,
+    // Cómo se destaca el objeto recién tomado: pantalla completa, aviso en una esquina, vuelo hasta su hueco, foco sobre
+    // él, marquesina o solo un pulso en su icono.
+    highlightStyle: 'full',
     // Tamaño del área útil de la ventana del tracker: por defecto, el de la ventana de Rebirth Item Tracker.
     viewWidth: 900, viewHeight: 121,
     // Maldición del ciego: 'floor' solo en el separador del piso, 'items' también en cada objeto, 'none' sin marca.
@@ -54,12 +66,15 @@ const DEFAULTS = {
 const LIMITS = {
   iconSize: [16, 96], rows: [0, 8], maxItems: [0, 200], highlightSeconds: [2, 20], fontSize: [10, 32], iconGap: [0, 16], rowGap: [0, 24], padding: [0, 32], radius: [0, 24], backgroundOpacity: [0, 100],
   viewWidth: [200, 3840], viewHeight: [60, 2160], whoOutlineSize: [1, 4], bgImageOpacity: [0, 100], bgImageScale: [10, 400], bgImageX: [0, 100], bgImageY: [0, 100],
+  sideWidth: [120, 400],
 };
 const CHOICES = {
   layout: ['banner', 'wide'], removed: ['dim', 'hide'], markItem: ['none', 'latest', 'hover'], background: ['transparent', 'solid', 'brick'], textEffect: ['none', 'shadow', 'outline'],
   iconEffect: ['none', 'glow', 'shadow'], progressStyle: ['icons', 'text'], pendingLook: ['color', 'gray'], align: ['left', 'center', 'right'], itemsPosition: ['above', 'below'],
   bgImageFit: ['cover', 'contain', 'stretch', 'tile', 'scale'], blindMark: ['floor', 'items', 'none'],
   whoOutline: ['none', 'outline', 'glow'],
+  ownerBadgeSize: ['small', 'medium', 'large'], ownerBadgeCorner: ['bl', 'br', 'tl', 'tr'],
+  highlightStyle: ['full', 'toast', 'fly', 'spotlight', 'ticker', 'pulse'],
 };
 // Imagen de fondo: se reconoce por sus primeros bytes, no por lo que diga quien la envía.
 const BG_IMAGE_MAX_BYTES = 10 * 1024 * 1024;
@@ -78,11 +93,43 @@ const OWNER_SPRITES = {
   jacob: { head: 'character_002x_jacob.png', hair: 'character_002x_jacobhair.png' },
   esau: { head: 'character_003x_esau.png', hair: 'character_003x_esauhair.png' },
 };
-const FLAGS = ['iconAuto', 'hideDone', 'floorGroups', 'transformsClose', 'bold', 'highlight', 'hoverDesc'];
+const FLAGS = ['iconAuto', 'hideDone', 'floorGroups', 'transformsClose', 'bold', 'highlight', 'hoverDesc', 'ownerBadgeBg', 'sideAuto'];
 const COLORS = ['color', 'textColor', 'accentColor', 'doneColor', 'blindColor', 'whoOutlineColor'];
 // El nombre de la fuente acaba en CSS entre comillas dobles: se admiten los caracteres de los nombres de fuentes
 // instaladas (letras, números, espacios, guiones, puntos, paréntesis, &, + y apóstrofos), nunca comillas dobles ni barras.
 const FONT_NAME = /^[\p{L}\p{N} _\-.&+'()]{1,60}$/u;
+
+// Perfiles: la configuración principal ('main') y otras con sus propios ajustes de lo que se muestra y cómo.
+// Cada vista elige el suyo con ?profile= en la dirección (la ventana del tracker, la fuente de OBS, la vista previa).
+const MAIN = 'main';
+const PROFILE_ID = /^p[0-9a-z]{1,20}$/;
+const THEME_ID = /^t[0-9a-z]{1,20}$/;
+const MAX_PROFILES = 10;
+const MAX_THEMES = 30;
+const NAME_MAX = 40;
+// Comunes a todos los perfiles: la ventana del tracker es una sola y la imagen de fondo, un solo archivo.
+const GLOBAL_OPTIONS = ['viewWidth', 'viewHeight', 'bgImage'];
+// Lo que no es de un perfil sino del programa: guardado, idioma, OBS y qué perfil usa cada vista.
+const GLOBAL_KEYS = ['language', 'obsServer', 'saveId', 'saveFile', 'windowProfile', 'obsProfile'];
+// Nombres escritos por el usuario: sin caracteres de control y con un largo razonable.
+const cleanName = s => (typeof s === 'string' ? s.replace(/\p{Cc}/gu, '').trim().slice(0, NAME_MAX) : '');
+const newId = prefix => prefix + Date.now().toString(36) + Math.floor(Math.random() * 1296).toString(36);
+
+// Copia en out solo las opciones conocidas con valores válidos. Devuelve out.
+function sanitizeOptions(o, out) {
+  o = o && typeof o === 'object' ? o : {};
+  for (const [k, [min, max]] of Object.entries(LIMITS)) if (Number.isFinite(o[k])) out[k] = Math.min(max, Math.max(min, Math.round(o[k])));
+  for (const [k, values] of Object.entries(CHOICES)) if (values.includes(o[k])) out[k] = o[k];
+  for (const k of FLAGS) if (typeof o[k] === 'boolean') out[k] = o[k];
+  for (const k of COLORS) if (/^#[0-9a-f]{6}$/i.test(o[k] || '')) out[k] = o[k];
+  if (FONT_NAME.test(o.font || '')) out.font = o.font.trim();
+  return out;
+}
+// Un tema solo guarda la apariencia (las claves de APPEARANCE), partiendo de la apariencia por defecto.
+const themeOptions = o => {
+  const all = sanitizeOptions(o, { ...APPEARANCE });
+  return Object.fromEntries(Object.keys(APPEARANCE).map(k => [k, all[k]]));
+};
 
 // Error causado por lo que eligió el usuario: su mensaje (clave de app/i18n.js) se le muestra traducido en el panel.
 class UserError extends Error {
@@ -100,9 +147,29 @@ function createTracker({ resDir, gameDir, steamUserdata, dataDir }, options = {}
   const choosePath = options.pickFile || pickFile;
   const achievementIcons = createAchievementIcons({ steamUserdata, cacheDir: path.join(dataDir, 'cache', 'achievements') });
 
-  function loadConfig() {
+  // El archivo tal cual: lo común y la configuración principal arriba, los demás perfiles en profiles y los temas en themes.
+  const readStored = () => {
     const c = readJson(CONFIG_FILE, {});
-    return { ...DEFAULTS, ...c, show: { ...DEFAULTS.show, ...c.show }, options: { ...DEFAULTS.options, ...c.options } };
+    return c && typeof c === 'object' ? c : {};
+  };
+  const profilesOf = stored => (stored.profiles && typeof stored.profiles === 'object' ? stored.profiles : {});
+  const profileId = (stored, id) => (id && id !== MAIN && Object.hasOwn(profilesOf(stored), id) ? id : MAIN);
+
+  // La configuración que ve una vista: lo común más los ajustes de su perfil (el principal si no existe).
+  function loadConfig(profile) {
+    const c = readStored(), profiles = profilesOf(c), id = profileId(c, profile);
+    const own = id === MAIN ? c : profiles[id];
+    const config = {
+      ...DEFAULTS, ...c, profile: id,
+      show: { ...DEFAULTS.show, ...own.show }, goals: Array.isArray(own.goals) ? own.goals : [], watched: Array.isArray(own.watched) ? own.watched : [],
+      options: { ...DEFAULTS.options, ...own.options },
+      themes: Array.isArray(c.themes) ? c.themes : [],
+      profileList: [{ id: MAIN, name: '' }, ...Object.entries(profiles).map(([pid, p]) => ({ id: pid, name: p.name }))],
+    };
+    for (const k of GLOBAL_OPTIONS) config.options[k] = { ...DEFAULTS.options, ...c.options }[k];
+    for (const k of ['windowProfile', 'obsProfile']) config[k] = profileId(c, config[k]);
+    delete config.profiles;
+    return config;
   }
   const languageOf = config => resolveLanguage(config.language);
   const T = (key, vars) => t(languageOf(loadConfig()), key, vars);
@@ -114,10 +181,12 @@ function createTracker({ resDir, gameDir, steamUserdata, dataDir }, options = {}
   };
 
   // Solo se aceptan claves y valores conocidos: el archivo se usa después sin más comprobaciones.
-  function sanitizeConfig(b) {
-    const out = loadConfig();
+  // Devuelve la configuración de la vista de ese perfil con los cambios; writeConfig() la reparte en el archivo.
+  function sanitizeConfig(b, profile) {
+    const out = loadConfig(profile), stored = readStored();
     if (Object.prototype.hasOwnProperty.call(LANGUAGES, b.language)) out.language = b.language;
     if (typeof b.obsServer === 'boolean') out.obsServer = b.obsServer;
+    for (const k of ['windowProfile', 'obsProfile']) if (typeof b[k] === 'string' && profileId(stored, b[k]) === b[k]) out[k] = b[k];
     if (b.saveId === null || b.saveId === CUSTOM_SAVE || saves().some(s => s.id === b.saveId)) out.saveId = b.saveId;
     if (typeof b.saveFile === 'string' && b.saveFile !== out.saveFile) {
       readSaveFile(b.saveFile);
@@ -127,12 +196,7 @@ function createTracker({ resDir, gameDir, steamUserdata, dataDir }, options = {}
     const known = (list, ids) => (Array.isArray(list) ? list.filter(id => ids.includes(id)) : null);
     out.goals = known(b.goals, COUNTER_GOALS.map(g => g.id)) || out.goals;
     out.watched = known(b.watched, WATCHED_ACHIEVEMENTS.map(id => 's' + id)) || out.watched;
-    const o = b.options || {};
-    for (const [k, [min, max]] of Object.entries(LIMITS)) if (Number.isFinite(o[k])) out.options[k] = Math.min(max, Math.max(min, Math.round(o[k])));
-    for (const [k, values] of Object.entries(CHOICES)) if (values.includes(o[k])) out.options[k] = o[k];
-    for (const k of FLAGS) if (typeof o[k] === 'boolean') out.options[k] = o[k];
-    for (const k of COLORS) if (/^#[0-9a-f]{6}$/i.test(o[k] || '')) out.options[k] = o[k];
-    if (FONT_NAME.test(o.font || '')) out.options.font = o.font.trim();
+    sanitizeOptions(b.options, out.options);
     return out;
   }
 
@@ -263,8 +327,8 @@ function createTracker({ resDir, gameDir, steamUserdata, dataDir }, options = {}
     };
   }
 
-  function state() {
-    const config = loadConfig();
+  function state(profile) {
+    const config = loadConfig(profile);
     const lang = languageOf(config);
     const save = readProgress(config, lang);
     return {
@@ -289,19 +353,87 @@ function createTracker({ resDir, gameDir, steamUserdata, dataDir }, options = {}
       goals: COUNTER_GOALS.map(g => ({ id: g.id, name: t(lang, 'goal.' + g.id), goal: g.goal })),
       watched: WATCHED_ACHIEVEMENTS.map(id => ({ id: 's' + id, name: achievementName(id, lang) })),
       appearance: APPEARANCE,
+      // Para el botón «Restablecer» de cada sección del panel.
+      defaults: { show: DEFAULTS.show, goals: DEFAULTS.goals, watched: DEFAULTS.watched, options: DEFAULTS.options },
     };
   }
 
-  function writeConfig(cfg) {
-    writeFile(CONFIG_FILE, JSON.stringify(cfg, null, 2));
-    if (options.onConfig) options.onConfig(cfg);
-    return cfg;
+  // Reparte la configuración de una vista en el archivo: lo común arriba y los ajustes en su perfil.
+  // Devuelve la configuración de esa vista ya guardada.
+  function writeConfig(view) {
+    const stored = readStored(), id = profileId(stored, view.profile);
+    const full = { ...stored };
+    for (const k of GLOBAL_KEYS) full[k] = view[k];
+    const own = { show: view.show, goals: view.goals, watched: view.watched, options: { ...view.options } };
+    if (id === MAIN) Object.assign(full, own);
+    else {
+      full.options = { ...DEFAULTS.options, ...stored.options };
+      for (const k of GLOBAL_OPTIONS) { full.options[k] = own.options[k]; delete own.options[k]; }
+      full.profiles = { ...profilesOf(stored), [id]: { ...profilesOf(stored)[id], ...own } };
+    }
+    return persist(full, id);
+  }
+
+  function persist(full, profile) {
+    writeFile(CONFIG_FILE, JSON.stringify(full, null, 2));
+    if (options.onConfig) options.onConfig(loadConfig());
+    return loadConfig(profile);
+  }
+
+  // ---------- Perfiles ----------
+  // create: copia los ajustes del perfil from; rename y delete. La configuración principal no se renombra ni se borra.
+  function profileAction(b) {
+    const stored = readStored(), profiles = { ...profilesOf(stored) };
+    const name = cleanName(b.name);
+    if (b.action === 'create') {
+      if (!name) throw new UserError('err.profileName');
+      if (Object.keys(profiles).length >= MAX_PROFILES) throw new UserError('err.tooManyProfiles', { max: MAX_PROFILES });
+      const from = loadConfig(b.from), id = newId('p'), opts = { ...from.options };
+      for (const k of GLOBAL_OPTIONS) delete opts[k];
+      profiles[id] = { name, show: from.show, goals: from.goals, watched: from.watched, options: opts };
+      return persist({ ...stored, profiles }, id);
+    }
+    if (!PROFILE_ID.test(b.id || '') || !Object.hasOwn(profiles, b.id)) throw new UserError('err.profileMissing');
+    if (b.action === 'rename') {
+      if (!name) throw new UserError('err.profileName');
+      profiles[b.id] = { ...profiles[b.id], name };
+      return persist({ ...stored, profiles }, b.id);
+    }
+    if (b.action === 'delete') {
+      delete profiles[b.id];
+      const full = { ...stored, profiles };
+      for (const k of ['windowProfile', 'obsProfile']) if (full[k] === b.id) full[k] = MAIN;
+      return persist(full, MAIN);
+    }
+    throw new UserError('err.badAction');
+  }
+
+  // ---------- Temas del usuario ----------
+  // save: guarda la apariencia recibida con un nombre; rename y delete. Devuelve la lista de temas.
+  function themeAction(b) {
+    const stored = readStored(), themes = Array.isArray(stored.themes) ? [...stored.themes] : [];
+    const name = cleanName(b.name);
+    if (b.action === 'save') {
+      if (!name) throw new UserError('err.themeName');
+      if (themes.length >= MAX_THEMES) throw new UserError('err.tooManyThemes', { max: MAX_THEMES });
+      themes.push({ id: newId('t'), name, options: themeOptions(b.options) });
+    } else {
+      const i = THEME_ID.test(b.id || '') ? themes.findIndex(x => x.id === b.id) : -1;
+      if (i < 0) throw new UserError('err.themeMissing');
+      if (b.action === 'rename') {
+        if (!name) throw new UserError('err.themeName');
+        themes[i] = { ...themes[i], name };
+      } else if (b.action === 'delete') themes.splice(i, 1);
+      else throw new UserError('err.badAction');
+    }
+    writeFile(CONFIG_FILE, JSON.stringify({ ...stored, themes }, null, 2));
+    return { themes };
   }
 
   // ---------- Imagen de fondo ----------
   // Se guarda una copia en userdata/ como background.<extensión>: así no depende de dónde estuviera la original.
   const bgFile = ext => path.join(dataDir, 'background.' + ext);
-  function setBackground(b) {
+  function setBackground(b, profile) {
     let buf = null, ext = '';
     if (!b.remove) {
       // Se comprueba antes de tocar nada: una imagen que no sirve no borra la que ya había.
@@ -312,7 +444,7 @@ function createTracker({ resDir, gameDir, steamUserdata, dataDir }, options = {}
     }
     for (const other of Object.keys(BG_IMAGE_TYPES)) if (other !== ext) fs.rmSync(bgFile(other), { force: true });
     if (ext) writeFile(bgFile(ext), buf);
-    const cfg = loadConfig();
+    const cfg = loadConfig(profile);
     cfg.options.bgImage = ext ? `${ext}:${Date.now()}` : '';
     return writeConfig(cfg);
   }
@@ -324,12 +456,10 @@ function createTracker({ resDir, gameDir, steamUserdata, dataDir }, options = {}
 
   // La ventana del tracker guarda aquí su tamaño cuando el usuario la estira. No avisa a onConfig: ya tiene ese tamaño.
   function setViewSize(width, height) {
-    const cfg = loadConfig();
+    const stored = readStored(), now = { ...DEFAULTS.options, ...stored.options };
     const [w, h] = [[width, LIMITS.viewWidth], [height, LIMITS.viewHeight]].map(([v, [min, max]]) => Math.min(max, Math.max(min, Math.round(v))));
-    if (cfg.options.viewWidth === w && cfg.options.viewHeight === h) return;
-    cfg.options.viewWidth = w;
-    cfg.options.viewHeight = h;
-    writeFile(CONFIG_FILE, JSON.stringify(cfg, null, 2));
+    if (now.viewWidth === w && now.viewHeight === h) return;
+    writeFile(CONFIG_FILE, JSON.stringify({ ...stored, options: { ...stored.options, viewWidth: w, viewHeight: h } }, null, 2));
   }
 
   const json = (status, body) => ({ status, type: MIME['.json'], body: JSON.stringify(body) });
@@ -344,16 +474,24 @@ function createTracker({ resDir, gameDir, steamUserdata, dataDir }, options = {}
 
   // Responde a una petición sin depender de cómo llega: servidor HTTP, Isaac Suite o la ventana de escritorio.
   // readJsonBody() devuelve el cuerpo ya interpretado. Devuelve { status, type, body }.
-  async function respond({ method, pathname, contentType, readJsonBody }) {
-    if (method === 'GET' && pathname === '/api/state') return json(200, state());
+  // query: los parámetros de la dirección (URLSearchParams); profile elige el perfil de la vista.
+  const POST_ACTIONS = {
+    '/api/config': (body, profile) => writeConfig(sanitizeConfig(body, profile)),
+    '/api/background': (body, profile) => setBackground(body, profile),
+    '/api/profiles': body => profileAction(body),
+    '/api/themes': body => themeAction(body),
+  };
+  async function respond({ method, pathname, contentType, readJsonBody, query = new URLSearchParams() }) {
+    const profile = query.get('profile');
+    if (method === 'GET' && pathname === '/api/state') return json(200, state(profile));
     if (method === 'GET' && pathname === '/api/choices') return json(200, choices());
     if (method === 'GET' && pathname === '/api/fonts') return json(200, { fonts: await listFonts() });
     // Exigir JSON impide que una página web cualquiera lance estas acciones contra el servidor local.
     if (method === 'POST' && !String(contentType).startsWith('application/json')) return json(415, { error: 'Expected JSON' });
-    if (method === 'POST' && (pathname === '/api/config' || pathname === '/api/background')) {
+    if (method === 'POST' && Object.hasOwn(POST_ACTIONS, pathname)) {
       try {
         const body = await readJsonBody();
-        return json(200, pathname === '/api/config' ? writeConfig(sanitizeConfig(body)) : setBackground(body));
+        return json(200, POST_ACTIONS[pathname](body && typeof body === 'object' ? body : {}, profile));
       } catch (e) {
         if (e instanceof UserError) return json(400, { error: T(e.key, e.vars) });
         throw e;
@@ -382,7 +520,7 @@ function createTracker({ resDir, gameDir, steamUserdata, dataDir }, options = {}
 
   // Adaptador para un servidor http de Node (server.js e Isaac Suite).
   async function handle(req, res, url, pathname) {
-    const r = await respond({ method: req.method, pathname, contentType: req.headers['content-type'], readJsonBody: () => readBody(req) });
+    const r = await respond({ method: req.method, pathname, contentType: req.headers['content-type'], readJsonBody: () => readBody(req), query: url.searchParams });
     send(res, r.status, r.body, r.type, r.cache);
   }
 

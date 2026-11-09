@@ -109,8 +109,17 @@ function openView() {
       tracker.setViewSize(width, height);
     }, 300);
   });
-  view.on('closed', () => { view = null; clearTimeout(resizing); });
-  view.loadURL(ORIGIN + '/overlay.html');
+  view.on('closed', () => { view = null; viewProfile = null; clearTimeout(resizing); });
+  loadViewProfile();
+}
+
+// La ventana del tracker usa el perfil elegido en el panel; si se cambia con la ventana abierta, se recarga con él.
+let viewProfile = null;
+function loadViewProfile() {
+  const profile = tracker.config().windowProfile;
+  if (!view || profile === viewProfile) return;
+  viewProfile = profile;
+  view.loadURL(`${ORIGIN}/overlay.html?profile=${encodeURIComponent(profile)}`);
 }
 
 // Un ancho o un alto escritos en el panel se aplican a la ventana abierta.
@@ -151,6 +160,7 @@ async function serve(request) {
     pathname: decodeURIComponent(url.pathname),
     contentType: request.headers.get('content-type'),
     readJsonBody: async () => JSON.parse(await request.text()),
+    query: url.searchParams,
   });
   return new Response(r.body, { status: r.status, headers: { 'Content-Type': r.type, 'Cache-Control': cacheControl(r.cache) } });
 }
@@ -167,7 +177,7 @@ function start() {
   tracker = createTracker({ ...paths, dataDir: DATA_DIR }, {
     desktop: true,
     pickFile: openFileDialog,
-    onConfig: config => { syncObs(config); syncViewSize(); },
+    onConfig: config => { syncObs(config); syncViewSize(); loadViewProfile(); },
     obsStatus: () => ({ running: obs.running, error: obs.error, port: OBS_PORT, url: `http://localhost:${OBS_PORT}/overlay.html` }),
   });
   protocol.handle(SCHEME, request => serve(request).catch(e => {

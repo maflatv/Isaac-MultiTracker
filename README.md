@@ -28,7 +28,9 @@ El ejecutable no tiene firma digital, así que Windows puede mostrar un aviso. P
 
 ## Uso
 
-- **Configurar:** el panel permite elegir el guardado, el idioma, qué se muestra y la apariencia. Los cambios se aplican al momento y se conservan al cerrar el programa.
+- **Configurar:** el panel permite elegir el guardado, el idioma, qué se muestra y la apariencia. Los cambios se aplican al momento y se conservan al cerrar el programa. La vista previa cambia mientras arrastras un control, y los ajustes que no tienen efecto con la configuración actual se ven atenuados. Cada sección tiene un botón **Restablecer**, y aplicar un tema o restablecer se puede deshacer. Los contadores y los logros vigilados tienen buscador.
+- **Perfiles:** crea perfiles con ajustes distintos (por ejemplo, uno para la ventana y otro para OBS). En **Perfiles** eliges el que editas y el que usa la ventana del tracker; junto al enlace para OBS, el que usa la fuente de navegador (el enlace lleva `?profile=`). El guardado, el idioma, el tamaño de la ventana y la imagen de fondo son comunes a todos.
+- **Temas propios, exportar e importar:** guarda tu apariencia como tema con un nombre, y exporta o importa los ajustes en un archivo `.json` para hacer copias o compartir tu estilo. La exportación nunca incluye el guardado, rutas ni la imagen de fondo.
 - **Ventana del tracker:** el botón **Abrir en ventana** abre el tracker en su propia ventana, de 900×121 por defecto. Puedes estirarla o escribir el ancho y el alto en **Distribución**; el tamaño y la posición se recuerdan.
 - **OBS:** añade la ventana «MultiTracker · Tracker» con una **Captura de ventana**. Si prefieres una fuente de navegador, activa en el panel **Permitir la vista como fuente de navegador en OBS** y usa http://localhost:7374/overlay.html. Esa opción es la única que abre un puerto, y solo en tu PC.
 
@@ -51,9 +53,9 @@ Requiere [Node.js](https://nodejs.org) 24. Las herramientas de compilación (Ele
 
 - **Objetos de la partida:** separados por piso con códigos como `B1`, `C2`, `Do1`, `BXL` o `CATH`. Los pisos con la maldición del ciego llevan su separador en otro color y un «?» tras el código. En **Iconos → Maldición del ciego** puedes marcar también cada objeto o no marcar nada. Si el Black Candle o Genesis quitan la maldición a mitad de piso, lo tomado después se muestra como un tramo normal del mismo piso. La runa Dagaz también la quita, pero el juego no registra en `log.txt` qué carta se usa, así que en ese caso el piso sigue marcado.
 - **Solo lo que el personaje posee:** los rerolls (D4, D100, sala de dados...) y Genesis quitan lo perdido.
-- **Jacob y Esaú, y Tainted Lazarus:** cada objeto indica quién lo lleva, con la cabeza del personaje sobre un círculo de su color (o una letra si faltan los recursos del juego). Con Tainted Lazarus se sigue cada cambio de forma, al limpiar una sala o con Flip, y un reroll solo cambia los objetos de la forma activa.
+- **Jacob y Esaú, y Tainted Lazarus:** cada objeto indica quién lo lleva con la cabeza del personaje (o una letra si faltan los recursos del juego). En **Iconos** puedes ponerla sobre un círculo de su color. Con Tainted Lazarus se sigue cada cambio de forma, al limpiar una sala o con Flip, también al continuar la partida, y un reroll solo cambia los objetos de la forma activa. Flip es común a las dos formas: se muestra una vez y sin cabeza.
 - **La lista completa en la misma ventana:** si los objetos no caben, los iconos se superponen un poco. En partidas muy largas también se ocultan los códigos de piso, aunque se mantienen sus líneas, y se usan iconos más pequeños. Al pasar el puntero, el icono se ve entero.
-- **Objeto recién tomado:** se destaca con una animación durante unos segundos.
+- **Objeto recién tomado:** se destaca durante unos segundos, con el estilo que elijas: pantalla completa, aviso en una esquina, vuelo hasta su sitio en la lista, foco sobre él, marquesina o solo un pulso en su icono.
 - **Descripción al pasar el puntero:** en la ventana del tracker, el objeto bajo el puntero se marca y su nombre, descripción y piso aparecen en una franja. En el panel puedes elegir qué objeto se marca: el que está bajo el puntero, el último tomado o ninguno.
 - **Cualquier fuente instalada:** el campo **Fuente** del panel sugiere las fuentes instaladas en tu PC.
 - **Personaje, seed y racha resaltados:** llevan un contorno negro alrededor de cada letra, como el texto del juego. En **Texto** puedes cambiarlo por un brillo o quitarlo, y elegir su color y su grosor.
@@ -74,7 +76,7 @@ MultiTracker busca sola las carpetas, incluidas otras bibliotecas de Steam. Si n
 | `gameDir` | La que contiene `log.txt`, en `Documents/My Games/Binding of Isaac Repentance+` |
 | `steamUserdata` | `userdata` de Steam, donde están los guardados |
 
-El archivo debe estar junto a `MultiTracker.exe`. Tus ajustes se guardan en `userdata/`, también junto a él: `config.json` (guardado, idioma, opciones y apariencia), `windows.json` (posición de las ventanas), `playtime.json` (tiempo de juego de cada archivo) y, si eliges una, `background.*` (la imagen de fondo). Si mueves `MultiTracker.exe`, lleva `userdata/` con él: el tiempo registrado no se puede volver a calcular.
+El archivo debe estar junto a `MultiTracker.exe`. Tus ajustes se guardan en `userdata/`, también junto a él: `config.json` (guardado, idioma, opciones, apariencia, perfiles y temas propios), `windows.json` (posición de las ventanas), `playtime.json` (tiempo de juego de cada archivo) y, si eliges una, `background.*` (la imagen de fondo). Si mueves `MultiTracker.exe`, lleva `userdata/` con él: el tiempo registrado no se puede volver a calcular.
 
 ## Fuente Upheaval (opcional)
 

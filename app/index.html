@@ -28,12 +28,12 @@
       <p class="note" id="saveStatus"></p>
       <p class="note" data-i18n="save.playtimeNote"></p>
     </section>
-    <section>
+    <section data-reset>
       <h2 data-i18n="run.title"></h2>
       <div id="showRun" class="checks"></div>
       <p class="note" id="logStatus"></p>
     </section>
-    <section>
+    <section data-reset>
       <h2 data-i18n="progress.title"></h2>
       <div id="showProgress" class="checks"></div>
       <div class="fields spaced">
@@ -46,15 +46,19 @@
       </div>
       <p class="note" data-i18n="progress.iconsNote"></p>
     </section>
-    <section>
+    <section data-reset class="pick-list">
       <h2 data-i18n="goals.title"></h2>
+      <div class="list-tools"><input type="search" class="list-search" data-i18n-placeholder="list.search" data-i18n-aria="list.search" spellcheck="false"><span class="list-count muted"></span></div>
       <div id="goals" class="checks"></div>
+      <p class="note list-empty" data-i18n="list.noMatch" hidden></p>
     </section>
-    <section>
+    <section data-reset class="pick-list">
       <h2 data-i18n="watched.title"></h2>
+      <div class="list-tools"><input type="search" class="list-search" data-i18n-placeholder="list.search" data-i18n-aria="list.search" spellcheck="false"><span class="list-count muted"></span></div>
       <div id="watched" class="checks"></div>
+      <p class="note list-empty" data-i18n="list.noMatch" hidden></p>
     </section>
-    <section>
+    <section data-reset>
       <h2 data-i18n="items.title"></h2>
       <div class="fields">
         <label><span data-i18n="items.max"></span> <input type="number" data-option="maxItems" min="0" max="200"></label>
@@ -72,12 +76,20 @@
         <label><input type="checkbox" data-option="transformsClose"> <span data-i18n="items.transformsClose"></span></label>
       </div>
     </section>
-    <section>
+    <section data-reset>
       <h2 data-i18n="highlight.title"></h2>
       <div class="checks"><label><input type="checkbox" data-option="highlight"> <span data-i18n="highlight.on"></span></label></div>
       <div class="fields">
+        <label><span data-i18n="highlight.style"></span>
+          <select data-option="highlightStyle">
+            <option value="full" data-i18n="highlight.full"></option><option value="toast" data-i18n="highlight.toast"></option>
+            <option value="fly" data-i18n="highlight.fly"></option><option value="spotlight" data-i18n="highlight.spotlight"></option>
+            <option value="ticker" data-i18n="highlight.ticker"></option><option value="pulse" data-i18n="highlight.pulse"></option>
+          </select>
+        </label>
         <label><span data-i18n="highlight.seconds"></span> <span class="slider"><input type="range" data-option="highlightSeconds" min="2" max="20"><output></output></span></label>
       </div>
+      <p class="note" id="highlightNote"></p>
       <button type="button" id="testHighlight" data-i18n="highlight.test"></button>
     </section>
     <section>
@@ -87,6 +99,14 @@
           <select id="theme" data-i18n-aria="look.themeAria"></select>
         </label>
       </div>
+      <div class="row-actions"><button type="button" id="themeSave" data-i18n="theme.save"></button></div>
+      <div class="name-row" id="themeNameRow" hidden>
+        <input id="themeName" maxlength="40" spellcheck="false" data-i18n-placeholder="theme.namePlaceholder" data-i18n-aria="theme.namePlaceholder">
+        <button type="button" class="primary name-ok" data-i18n="name.ok"></button><button type="button" class="name-cancel" data-i18n="name.cancel"></button>
+      </div>
+      <div id="myThemes" class="my-themes"></div>
+      <p class="note error" id="themeError"></p>
+      <div class="group" data-reset>
       <h3 data-i18n="look.text"></h3>
       <div class="fields">
         <label><span data-i18n="look.font"></span> <input data-option="font" list="fonts" maxlength="60" spellcheck="false" autocomplete="off"></label>
@@ -94,7 +114,7 @@
           <option value="Upheaval"><option value="Segoe UI"><option value="Arial"><option value="Bahnschrift"><option value="Consolas"><option value="Georgia"><option value="Impact"><option value="Trebuchet MS"><option value="Verdana"><option value="Comic Sans MS">
         </datalist>
         <label><span data-i18n="look.fontSize"></span> <span class="slider"><input type="range" data-option="fontSize" min="10" max="32"><output></output></span></label>
-        <label><span data-i18n="look.effect"></span>
+        <label><span data-i18n="look.textEffect"></span>
           <select data-option="textEffect"><option value="none" data-i18n="look.none"></option><option value="shadow" data-i18n="look.shadow"></option><option value="outline" data-i18n="look.outline"></option></select>
         </label>
         <label><span data-i18n="look.whoOutline"></span>
@@ -107,6 +127,8 @@
         <label><span data-i18n="look.doneColor"></span> <input type="color" data-option="doneColor"></label>
       </div>
       <div class="checks"><label><input type="checkbox" data-option="bold"> <span data-i18n="look.bold"></span></label></div>
+      </div>
+      <div class="group" data-reset>
       <h3 data-i18n="look.icons"></h3>
       <div class="fields">
         <label><span data-i18n="look.iconAuto"></span> <input type="checkbox" data-option="iconAuto"></label>
@@ -117,11 +139,22 @@
           <select data-option="blindMark"><option value="floor" data-i18n="look.blindFloor"></option><option value="items" data-i18n="look.blindItems"></option><option value="none" data-i18n="look.blindNone"></option></select>
         </label>
         <label><span data-i18n="look.blindColor"></span> <input type="color" data-option="blindColor"></label>
-        <label><span data-i18n="look.effect"></span>
+        <label><span data-i18n="look.iconEffect"></span>
           <select data-option="iconEffect"><option value="none" data-i18n="look.none"></option><option value="glow" data-i18n="look.glow"></option><option value="shadow" data-i18n="look.shadow"></option></select>
         </label>
       </div>
+      <div class="fields spaced">
+        <label><span data-i18n="look.ownerBadgeSize"></span>
+          <select data-option="ownerBadgeSize"><option value="small" data-i18n="look.badgeSmall"></option><option value="medium" data-i18n="look.badgeMedium"></option><option value="large" data-i18n="look.badgeLarge"></option></select>
+        </label>
+        <label><span data-i18n="look.ownerBadgeCorner"></span>
+          <select data-option="ownerBadgeCorner"><option value="bl" data-i18n="look.cornerBl"></option><option value="br" data-i18n="look.cornerBr"></option><option value="tl" data-i18n="look.cornerTl"></option><option value="tr" data-i18n="look.cornerTr"></option></select>
+        </label>
+      </div>
+      <div class="checks single"><label><input type="checkbox" data-option="ownerBadgeBg"> <span data-i18n="look.ownerBadgeBg"></span></label></div>
       <p class="note error" id="iconNote"></p>
+      </div>
+      <div class="group" data-reset>
       <h3 data-i18n="look.layout"></h3>
       <div class="fields">
         <label><span data-i18n="look.mode"></span>
@@ -132,13 +165,17 @@
         <label><span data-i18n="look.align"></span>
           <select data-option="align"><option value="left" data-i18n="look.left"></option><option value="center" data-i18n="look.center"></option><option value="right" data-i18n="look.right"></option></select>
         </label>
-        <label><span data-i18n="look.itemsPosition"></span>
+        <label><span data-i18n="look.itemsPlace"></span>
           <select data-option="itemsPosition"><option value="below" data-i18n="look.itemsBelow"></option><option value="above" data-i18n="look.itemsAbove"></option></select>
         </label>
         <label><span data-i18n="look.rowGap"></span> <span class="slider"><input type="range" data-option="rowGap" min="0" max="24"><output></output></span></label>
         <label><span data-i18n="look.padding"></span> <span class="slider"><input type="range" data-option="padding" min="0" max="32"><output></output></span></label>
+        <label><span data-i18n="look.sideAuto"></span> <input type="checkbox" data-option="sideAuto"></label>
+        <label><span data-i18n="look.sideWidth"></span> <span class="slider"><input type="range" data-option="sideWidth" min="120" max="400" step="10"><output></output></span></label>
       </div>
       <p class="note" data-i18n="look.sizeNote"></p>
+      </div>
+      <div class="group" data-reset>
       <h3 data-i18n="look.background"></h3>
       <div class="fields">
         <label><span data-i18n="look.bgType"></span>
@@ -166,6 +203,36 @@
       </div>
       <p class="note error" id="bgImageError"></p>
       <p class="note" data-i18n="look.bgImageNote"></p>
+      </div>
+    </section>
+    <section id="profiles">
+      <h2 data-i18n="profile.title"></h2>
+      <div class="fields">
+        <label><span data-i18n="profile.editing"></span> <select id="profileSelect"></select></label>
+      </div>
+      <div class="row-actions">
+        <button type="button" id="profileNew" data-i18n="profile.new"></button>
+        <button type="button" id="profileRename" data-i18n="profile.rename"></button>
+        <button type="button" id="profileDelete" data-i18n="profile.delete"></button>
+      </div>
+      <div class="name-row" id="profileNameRow" hidden>
+        <input id="profileName" maxlength="40" spellcheck="false" data-i18n-placeholder="profile.namePlaceholder" data-i18n-aria="profile.namePlaceholder">
+        <button type="button" class="primary name-ok" data-i18n="name.ok"></button><button type="button" class="name-cancel" data-i18n="name.cancel"></button>
+      </div>
+      <div class="fields spaced">
+        <label><span data-i18n="profile.window"></span> <select id="windowProfile"></select></label>
+      </div>
+      <p class="note error" id="profileError"></p>
+      <p class="note" data-i18n="profile.note"></p>
+      <h3 data-i18n="transfer.title"></h3>
+      <div class="row-actions">
+        <button type="button" id="exportLook" data-i18n="transfer.exportLook"></button>
+        <button type="button" id="exportAll" data-i18n="transfer.exportAll"></button>
+        <button type="button" id="importButton" data-i18n="transfer.import"></button>
+        <input type="file" id="importFile" accept=".json,application/json" hidden>
+      </div>
+      <p class="note error" id="transferError"></p>
+      <p class="note" data-i18n="transfer.note"></p>
     </section>
   </form>
   <section id="previewPane">
@@ -176,8 +243,10 @@
     </div>
     <p class="note" id="obsNote" hidden data-i18n="obs.serverNote"></p>
     <p class="note" id="linkRow"><span data-i18n="preview.obsLink"></span> <code id="link"></code></p>
+    <div class="fields obs-profile" id="obsProfileRow"><label><span data-i18n="profile.obs"></span> <select id="obsProfile"></select></label></div>
   </section>
 </main>
+<div id="toast" role="status" hidden><span id="toastText"></span><button type="button" id="toastUndo" data-i18n="panel.undo"></button><button type="button" id="toastClose" class="link" data-i18n-aria="panel.close" data-i18n-title="panel.close">×</button></div>
 <dialog id="aboutDialog" aria-labelledby="aboutTitle">
   <h2 id="aboutTitle" data-i18n="about.title"></h2>
   <p data-i18n="about.lead"></p>
