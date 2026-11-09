@@ -1,5 +1,11 @@
 # MultiTracker
 
+## Apoya el proyecto
+
+MultiTracker es gratuito. Si te resulta útil y quieres apoyar a Mafla, puedes hacerlo en [Ko-fi](https://ko-fi.com/maflatv).
+
+## Qué es
+
 Tracker para The Binding of Isaac: Repentance+ que reúne en una sola vista los objetos de la partida actual y el progreso hacia Dead God. Se usa en su propia ventana y puede capturarse en OBS.
 
 Solo lee archivos del juego: no modifica tus partidas ni necesita mods.
@@ -94,7 +100,3 @@ Proyecto de fans, sin afiliación con los creadores del juego.
 ## Licencia
 
 El código de MultiTracker se publica bajo la [licencia MIT](LICENSE). `data/items.json` y sus traducciones en `data/descriptions/` conservan la licencia de Rebirth Item Tracker, en `data/LICENSE-RebirthItemTracker.txt`.
-
-## Apoya el proyecto
-
-MultiTracker es gratuito. Si te resulta útil y quieres apoyar a Mafla, puedes hacerlo en [Ko-fi](https://ko-fi.com/maflatv).
