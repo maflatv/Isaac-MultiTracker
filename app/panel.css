@@ -44,6 +44,26 @@ button.reset:hover { color: var(--accent2); }
 .list-tools { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
 .list-search { flex: 1; min-width: 0; }
 .list-count { font-size: 12px; white-space: nowrap; }
+/* Apoyo en Ko-fi: botón en la barra superior y sección al final del panel */
+a.button { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 4px; border: 1px solid var(--line); background: var(--panel2); color: var(--text); text-decoration: none; cursor: pointer; }
+a.button.support { border-color: var(--accent2); color: var(--accent2); }
+a.button.support:hover { background: var(--accent2); color: #1d1714; }
+/* Apartado «Acerca de» */
+.about-box { border-color: var(--accent2) !important; }
+.about-box p { margin: 0 0 8px; }
+.about-box a:not(.button) { color: var(--accent2); }
+.about-box .heart { color: var(--accent2); }
+.about-author { color: var(--muted); }
+.about-author strong { color: var(--text); }
+.social-links { display: flex; flex-wrap: wrap; gap: 6px; }
+.about-credits { margin-top: 12px; }
+.about-credits summary { cursor: pointer; color: var(--muted); font-size: 12px; font-weight: 600; }
+.about-credits summary:hover { color: var(--accent2); }
+.about-credits dl { margin: 4px 0 8px; }
+.about-credits dt { margin-top: 8px; color: var(--muted); }
+.about-credits dd { margin: 2px 0 0; }
+.about-box.flash { animation: about-flash 1.2s ease-out; }
+@keyframes about-flash { 0%, 40% { box-shadow: 0 0 0 3px var(--accent2); } 100% { box-shadow: 0 0 0 0 transparent; } }
 /* Perfiles, temas propios y copias */
 .row-actions { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 2px; }
 .name-row { display: flex; gap: 6px; margin: 6px 0; }

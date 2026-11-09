@@ -1,7 +1,14 @@
 // Panel de configuración: cada cambio se guarda al momento y la vista lo recoge en su siguiente lectura.
 // Fuera de la suite el panel está en la raíz: no hay hub al que volver.
 if (location.pathname === '/') document.querySelector('a.back').remove();
-document.getElementById('about').addEventListener('click', () => document.getElementById('aboutDialog').showModal());
+// «Acerca de» lleva al apartado del final del panel y lo resalta un momento.
+document.getElementById('about').addEventListener('click', () => {
+  const box = document.getElementById('aboutBox');
+  box.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  box.classList.remove('flash');
+  void box.offsetWidth;
+  box.classList.add('flash');
+});
 
 const STATUS_POLL_MS = 3000;
 const CUSTOM_SAVE = 'custom';
@@ -543,11 +550,27 @@ function initLanguage(languages) {
   });
 }
 
+// Apartado «Acerca de»: redes de Mafla y apoyo en Ko-fi (también en el botón de la barra superior).
+// En la aplicación de escritorio, los enlaces se abren en el navegador (desktop/main.js).
+const SOCIAL = [
+  ['GitHub', 'https://github.com/maflatv'],
+  ['YouTube', 'https://www.youtube.com/@MaflaTV'],
+  ['Twitch', 'https://www.twitch.tv/maflatv'],
+  ['Instagram', 'https://www.instagram.com/mafla.tv/'],
+  ['TikTok', 'https://www.tiktok.com/@maflatv'],
+];
+const externalLink = (href, text, className) => {
+  const a = document.createElement('a');
+  a.href = href; a.target = '_blank'; a.rel = 'noopener'; a.textContent = text;
+  if (className) a.className = className;
+  return a;
+};
+
 function initAbout() {
   const [before, after = ''] = tr('about.supportText').split('{link}');
-  const a = document.createElement('a');
-  a.href = KOFI; a.target = '_blank'; a.rel = 'noopener'; a.textContent = 'Ko-fi';
-  $('supportText').replaceChildren(before, a, after);
+  $('supportPanelText').replaceChildren(before, externalLink(KOFI, 'Ko-fi'), after);
+  $('supportLink').href = $('supportButton').href = KOFI;
+  $('socialLinks').replaceChildren(...SOCIAL.map(([name, href]) => externalLink(href, name, 'button')));
 }
 
 // En la aplicación de escritorio, el enlace para OBS solo existe si el usuario lo activa.

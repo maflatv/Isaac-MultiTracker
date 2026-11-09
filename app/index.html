@@ -11,6 +11,7 @@
   <h1><a class="back" href="/" data-i18n-title="panel.back" data-i18n-aria="panel.back">←</a>MultiTracker</h1>
   <div class="actions">
     <label class="lang"><span data-i18n="panel.language"></span> <select id="language"></select></label>
+    <a id="supportLink" class="button support" target="_blank" rel="noopener"><span aria-hidden="true">♥</span> <span data-i18n="about.support"></span></a>
     <button id="about" data-i18n="panel.about"></button>
     <button id="copyLink" data-i18n="panel.copyLink"></button>
     <button id="openWindow" class="primary" data-i18n="panel.openWindow"></button>
@@ -234,6 +235,34 @@
       <p class="note error" id="transferError"></p>
       <p class="note" data-i18n="transfer.note"></p>
     </section>
+    <section id="aboutBox" class="about-box">
+      <h2 data-i18n="about.title"></h2>
+      <p data-i18n="about.lead"></p>
+      <p class="about-author"><strong>Mafla</strong> · <span data-i18n="about.creator"></span></p>
+      <h3 data-i18n="about.social"></h3>
+      <div class="social-links" id="socialLinks"></div>
+      <h3><span aria-hidden="true" class="heart">♥</span> <span data-i18n="about.support"></span></h3>
+      <p id="supportPanelText"></p>
+      <a id="supportButton" class="button support" target="_blank" rel="noopener" data-i18n="support.button"></a>
+      <details class="about-credits">
+        <summary data-i18n="about.credits"></summary>
+      <dl>
+        <dt><a href="https://github.com/maflatv/Isaac-MultiTracker" target="_blank" rel="noopener">MultiTracker</a></dt>
+        <dd><strong>Mafla</strong>. <span data-i18n="about.creator"></span></dd>
+        <dt><a href="https://github.com/Hyphen-ated/RebirthItemTracker" target="_blank" rel="noopener">Rebirth Item Tracker</a></dt>
+        <dd><strong>Brett824 <span data-i18n="about.and"></span> Hyphen-ated</strong>. <span data-i18n="about.rit"></span></dd>
+        <dt>Isaac Deadgod Tracker</dt>
+        <dd><strong>veryhighlibido</strong>. <span data-i18n="about.deadgod"></span></dd>
+        <dt><a href="https://www.dafont.com/aenigma.d188" target="_blank" rel="noopener" data-i18n="about.font"></a></dt>
+        <dd><strong>Brian Kent (Ænigma Fonts)</strong>. <span data-i18n="about.fontNote"></span></dd>
+        <dt><a href="https://www.electronjs.org" target="_blank" rel="noopener">Electron</a> (Chromium, Node.js)</dt>
+        <dd><strong>OpenJS Foundation <span data-i18n="about.and"></span> <span data-i18n="about.contributors"></span></strong>. <span data-i18n="about.electron"></span></dd>
+        <dt>The Binding of Isaac: Repentance+</dt>
+        <dd><strong>Edmund McMillen <span data-i18n="about.and"></span> Nicalis</strong>. <span data-i18n="about.game"></span></dd>
+      </dl>
+        <p class="note" data-i18n="about.fans"></p>
+      </details>
+    </section>
   </form>
   <section id="previewPane">
     <h2 data-i18n="preview.title"></h2>
@@ -247,29 +276,6 @@
   </section>
 </main>
 <div id="toast" role="status" hidden><span id="toastText"></span><button type="button" id="toastUndo" data-i18n="panel.undo"></button><button type="button" id="toastClose" class="link" data-i18n-aria="panel.close" data-i18n-title="panel.close">×</button></div>
-<dialog id="aboutDialog" aria-labelledby="aboutTitle">
-  <h2 id="aboutTitle" data-i18n="about.title"></h2>
-  <p data-i18n="about.lead"></p>
-  <h3 data-i18n="about.credits"></h3>
-  <dl>
-    <dt><a href="https://github.com/maflatv/Isaac-MultiTracker" target="_blank" rel="noopener">MultiTracker</a></dt>
-    <dd><strong>Mafla</strong>. <span data-i18n="about.creator"></span></dd>
-    <dt><a href="https://github.com/Hyphen-ated/RebirthItemTracker" target="_blank" rel="noopener">Rebirth Item Tracker</a></dt>
-    <dd><strong>Brett824 <span data-i18n="about.and"></span> Hyphen-ated</strong>. <span data-i18n="about.rit"></span></dd>
-    <dt>Isaac Deadgod Tracker</dt>
-    <dd><strong>veryhighlibido</strong>. <span data-i18n="about.deadgod"></span></dd>
-    <dt><a href="https://www.dafont.com/aenigma.d188" target="_blank" rel="noopener" data-i18n="about.font"></a></dt>
-    <dd><strong>Brian Kent (Ænigma Fonts)</strong>. <span data-i18n="about.fontNote"></span></dd>
-    <dt><a href="https://www.electronjs.org" target="_blank" rel="noopener">Electron</a> (Chromium, Node.js)</dt>
-    <dd><strong>OpenJS Foundation <span data-i18n="about.and"></span> <span data-i18n="about.contributors"></span></strong>. <span data-i18n="about.electron"></span></dd>
-    <dt>The Binding of Isaac: Repentance+</dt>
-    <dd><strong>Edmund McMillen <span data-i18n="about.and"></span> Nicalis</strong>. <span data-i18n="about.game"></span></dd>
-  </dl>
-  <p class="note" data-i18n="about.fans"></p>
-  <h3 data-i18n="about.support"></h3>
-  <p id="supportText"></p>
-  <form method="dialog"><button class="primary" data-i18n="about.close"></button></form>
-</dialog>
 <script src="i18n.js"></script>
 <script src="panel.js"></script>
 </body>
