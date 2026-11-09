@@ -4,9 +4,7 @@ if (location.pathname === '/') document.querySelector('a.back').remove();
 document.getElementById('about').addEventListener('click', () => document.getElementById('aboutDialog').showModal());
 
 const STATUS_POLL_MS = 3000;
-const WINDOW_FEATURES = 'popup,width=900,height=121';
 const CUSTOM_SAVE = 'custom';
-const BANNER_HEIGHT = 121;
 const MIN_AUTO_ICON = 24;
 const FLOOR_LABEL_HEIGHT = 14;
 const KOFI = 'https://ko-fi.com/maflatv';
@@ -37,22 +35,36 @@ function checkbox(parent, label, checked, onChange) {
   parent.append(l);
 }
 
+// La ventana del tracker guarda su tamaño al estirarla: el panel solo lo envía si el usuario lo cambia en sus campos,
+// para no devolverla al tamaño anterior al cambiar cualquier otra opción.
+const SIZE_OPTIONS = ['viewWidth', 'viewHeight'];
+
 // Devuelve el mensaje de error del servidor, o '' si se guardó.
-async function save() {
-  const r = await fetch('api/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(config) });
+async function save(sizeChanged = false) {
+  const payload = { ...config, options: { ...config.options } };
+  if (!sizeChanged) for (const k of SIZE_OPTIONS) delete payload.options[k];
+  const r = await fetch('api/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
   const body = await r.json();
   if (!r.ok) return body.error || tr('save.failed');
-  config = body;
+  applyConfig(body);
+  return '';
+}
+
+function applyConfig(next) {
+  config = next;
   syncPreviewSize();
   syncIconControls();
+  syncBgImage();
   const preview = $('preview').contentWindow;
   if (preview && preview.refresh) preview.refresh();
-  return '';
 }
 
 // En modo banner la vista previa tiene el tamaño real de la ventana.
 function syncPreviewSize() {
-  $('preview').classList.toggle('banner', config.options.layout === 'banner');
+  const banner = config.options.layout === 'banner', p = $('preview');
+  p.classList.toggle('banner', banner);
+  p.style.width = banner ? config.options.viewWidth + 'px' : '';
+  p.style.height = banner ? config.options.viewHeight + 'px' : '';
 }
 
 // El tamaño fijo no se aplica en automático; y unas filas que no caben se avisan en vez de cambiarlas.
@@ -62,7 +74,41 @@ function syncIconControls() {
   const size = o.iconAuto ? MIN_AUTO_ICON : o.iconSize;
   const floorRow = o.floorGroups ? FLOOR_LABEL_HEIGHT : 0;
   const needed = o.rows * (size + floorRow) + (o.rows - 1) * o.iconGap + o.padding * 2;
-  $('iconNote').textContent = o.layout === 'banner' && o.rows && needed > BANNER_HEIGHT ? tr('look.rowsTooTall', { needed, height: BANNER_HEIGHT }) : '';
+  $('iconNote').textContent = o.layout === 'banner' && o.rows && needed > o.viewHeight ? tr('look.rowsTooTall', { needed, height: o.viewHeight }) : '';
+}
+
+// ---------- Imagen de fondo ----------
+const BG_IMAGE_MAX_BYTES = 10 * 1024 * 1024;
+
+function syncBgImage() {
+  const o = config.options, has = !!o.bgImage;
+  $('bgImageStatus').textContent = tr(has ? 'look.bgImageSet' : 'look.bgImageNone');
+  $('bgImageRemove').hidden = !has;
+  for (const e of document.querySelectorAll('.bg-image-only [data-option]')) e.disabled = !has;
+  document.querySelector('[data-option="bgImageScale"]').disabled = !has || !['tile', 'scale'].includes(o.bgImageFit);
+}
+
+async function sendBackground(body) {
+  const r = await fetch('api/background', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const res = await r.json();
+  $('bgImageError').textContent = r.ok ? '' : res.error || tr('save.failed');
+  if (r.ok) applyConfig(res);
+}
+
+function initBgImage() {
+  const input = $('bgImageFile');
+  $('bgImageChoose').addEventListener('click', () => input.click());
+  input.addEventListener('change', () => {
+    const f = input.files[0];
+    input.value = '';
+    if (!f) return;
+    if (f.size > BG_IMAGE_MAX_BYTES) { $('bgImageError').textContent = tr('err.bgImage'); return; }
+    const reader = new FileReader();
+    reader.onload = () => sendBackground({ data: reader.result });
+    reader.readAsDataURL(f);
+  });
+  $('bgImageRemove').addEventListener('click', () => sendBackground({ remove: true }));
+  syncBgImage();
 }
 
 function toggleInList(list, id, on) {
@@ -132,7 +178,7 @@ function initOptions() {
     e.addEventListener('input', () => { const out = e.parentElement.querySelector('output'); if (out) out.value = e.value; });
     e.addEventListener('change', async () => {
       config.options[key] = e.type === 'checkbox' ? e.checked : e.type === 'number' || e.type === 'range' ? Number(e.value) : e.value;
-      await save();
+      await save(SIZE_OPTIONS.includes(key));
       // El servidor rechaza los valores no válidos: el control vuelve al valor guardado.
       showOption(e);
     });
@@ -207,6 +253,17 @@ function syncObs(obs) {
 
 async function refreshStatus() {
   const s = await fetch('api/state').then(r => r.json());
+  // Si se ha estirado la ventana del tracker, el ancho y el alto del panel la siguen (salvo mientras se escriben).
+  const o = s.config.options;
+  if (SIZE_OPTIONS.some(k => o[k] !== config.options[k])) {
+    for (const k of SIZE_OPTIONS) {
+      config.options[k] = o[k];
+      const input = document.querySelector(`[data-option="${k}"]`);
+      if (input !== document.activeElement) showOption(input);
+    }
+    syncPreviewSize();
+    syncIconControls();
+  }
   const logErr = s.sources.log.error, src = s.sources.save;
   $('logStatus').className = 'note' + (logErr ? ' error' : '');
   $('logStatus').textContent = logErr ? tr('run.logError', { error: logErr })
@@ -243,6 +300,7 @@ async function init() {
   for (const g of choices.goals) checkbox($('goals'), g.name, config.goals.includes(g.id), on => { toggleInList(config.goals, g.id, on); save(); });
   for (const w of choices.watched) checkbox($('watched'), w.name, config.watched.includes(w.id), on => { toggleInList(config.watched, w.id, on); save(); });
   initOptions();
+  initBgImage();
   syncIconControls();
   initThemes(choices.appearance);
   initObs();
@@ -255,7 +313,7 @@ async function init() {
     $('copyLink').textContent = tr('panel.linkCopied');
     setTimeout(() => { $('copyLink').textContent = tr('panel.copyLink'); }, 1500);
   });
-  $('openWindow').addEventListener('click', () => window.open(overlayUrl, 'isaac-tracker', WINDOW_FEATURES));
+  $('openWindow').addEventListener('click', () => window.open(overlayUrl, 'isaac-tracker', `popup,width=${config.options.viewWidth},height=${config.options.viewHeight}`));
 
   refreshStatus();
   setInterval(refreshStatus, STATUS_POLL_MS);

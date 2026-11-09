@@ -84,17 +84,40 @@ function saveBounds(id, bounds) {
   writeFile(WINDOWS_FILE, JSON.stringify({ ...readJson(WINDOWS_FILE, {}), [id]: bounds }, null, 2));
 }
 
+// El tamaño de la vista es una opción del panel (ancho y alto); windows.json solo guarda dónde estaba la ventana.
+const viewSize = () => {
+  const o = tracker.config().options;
+  return { width: o.viewWidth || VIEW_SIZE.width, height: o.viewHeight || VIEW_SIZE.height };
+};
+
 function openView() {
   if (view) { if (view.isMinimized()) view.restore(); view.focus(); return; }
-  view = createWindow({ ...savedBounds('view', VIEW_SIZE), useContentSize: true, minWidth: 200, minHeight: 60 }, 'MultiTracker · Tracker');
+  view = createWindow({ ...savedBounds('view', VIEW_SIZE), ...viewSize(), useContentSize: true, minWidth: 200, minHeight: 60 }, 'MultiTracker · Tracker');
   // Con useContentSize, x e y son la posición de la ventana y el ancho y el alto los del contenido.
   // Guardar la posición del contenido desplazaría la ventana el alto de la barra de título en cada sesión.
   view.on('close', () => {
     const { x, y } = view.getBounds(), { width, height } = view.getContentBounds();
     saveBounds('view', { x, y, width, height });
   });
-  view.on('closed', () => { view = null; });
+  // Estirar la ventana cambia el ancho y el alto del panel; se espera a que el usuario suelte el borde.
+  let resizing = null;
+  view.on('resize', () => {
+    clearTimeout(resizing);
+    resizing = setTimeout(() => {
+      if (!view || view.isMinimized() || view.isMaximized()) return;
+      const { width, height } = view.getContentBounds();
+      tracker.setViewSize(width, height);
+    }, 300);
+  });
+  view.on('closed', () => { view = null; clearTimeout(resizing); });
   view.loadURL(ORIGIN + '/overlay.html');
+}
+
+// Un ancho o un alto escritos en el panel se aplican a la ventana abierta.
+function syncViewSize() {
+  if (!view || view.isMinimized() || view.isMaximized()) return;
+  const want = viewSize(), now = view.getContentBounds();
+  if (want.width !== now.width || want.height !== now.height) view.setContentSize(want.width, want.height);
 }
 
 function openFileDialog(initialDir, text) {
@@ -144,7 +167,7 @@ function start() {
   tracker = createTracker({ ...paths, dataDir: DATA_DIR }, {
     desktop: true,
     pickFile: openFileDialog,
-    onConfig: syncObs,
+    onConfig: config => { syncObs(config); syncViewSize(); },
     obsStatus: () => ({ running: obs.running, error: obs.error, port: OBS_PORT, url: `http://localhost:${OBS_PORT}/overlay.html` }),
   });
   protocol.handle(SCHEME, request => serve(request).catch(e => {

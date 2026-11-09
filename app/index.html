@@ -97,6 +97,11 @@
         <label><span data-i18n="look.effect"></span>
           <select data-option="textEffect"><option value="none" data-i18n="look.none"></option><option value="shadow" data-i18n="look.shadow"></option><option value="outline" data-i18n="look.outline"></option></select>
         </label>
+        <label><span data-i18n="look.whoOutline"></span>
+          <select data-option="whoOutline"><option value="none" data-i18n="look.none"></option><option value="outline" data-i18n="look.outline"></option><option value="glow" data-i18n="look.glow"></option></select>
+        </label>
+        <label><span data-i18n="look.whoOutlineColor"></span> <input type="color" data-option="whoOutlineColor"></label>
+        <label><span data-i18n="look.whoOutlineSize"></span> <span class="slider"><input type="range" data-option="whoOutlineSize" min="1" max="4"><output></output></span></label>
         <label><span data-i18n="look.textColor"></span> <input type="color" data-option="textColor"></label>
         <label><span data-i18n="look.accentColor"></span> <input type="color" data-option="accentColor"></label>
         <label><span data-i18n="look.doneColor"></span> <input type="color" data-option="doneColor"></label>
@@ -108,6 +113,9 @@
         <label><span data-i18n="look.iconSize"></span> <span class="slider"><input type="range" data-option="iconSize" min="16" max="96" step="4"><output></output></span></label>
         <label><span data-i18n="look.rows"></span> <span class="slider"><input type="range" data-option="rows" min="0" max="8"><output></output></span></label>
         <label><span data-i18n="look.iconGap"></span> <span class="slider"><input type="range" data-option="iconGap" min="0" max="16"><output></output></span></label>
+        <label><span data-i18n="look.blindMark"></span>
+          <select data-option="blindMark"><option value="floor" data-i18n="look.blindFloor"></option><option value="items" data-i18n="look.blindItems"></option><option value="none" data-i18n="look.blindNone"></option></select>
+        </label>
         <label><span data-i18n="look.blindColor"></span> <input type="color" data-option="blindColor"></label>
         <label><span data-i18n="look.effect"></span>
           <select data-option="iconEffect"><option value="none" data-i18n="look.none"></option><option value="glow" data-i18n="look.glow"></option><option value="shadow" data-i18n="look.shadow"></option></select>
@@ -119,6 +127,8 @@
         <label><span data-i18n="look.mode"></span>
           <select data-option="layout"><option value="banner" data-i18n="look.banner"></option><option value="wide" data-i18n="look.wide"></option></select>
         </label>
+        <label><span data-i18n="look.viewWidth"></span> <input type="number" data-option="viewWidth" min="200" max="3840" step="1"></label>
+        <label><span data-i18n="look.viewHeight"></span> <input type="number" data-option="viewHeight" min="60" max="2160" step="1"></label>
         <label><span data-i18n="look.align"></span>
           <select data-option="align"><option value="left" data-i18n="look.left"></option><option value="center" data-i18n="look.center"></option><option value="right" data-i18n="look.right"></option></select>
         </label>
@@ -128,6 +138,7 @@
         <label><span data-i18n="look.rowGap"></span> <span class="slider"><input type="range" data-option="rowGap" min="0" max="24"><output></output></span></label>
         <label><span data-i18n="look.padding"></span> <span class="slider"><input type="range" data-option="padding" min="0" max="32"><output></output></span></label>
       </div>
+      <p class="note" data-i18n="look.sizeNote"></p>
       <h3 data-i18n="look.background"></h3>
       <div class="fields">
         <label><span data-i18n="look.bgType"></span>
@@ -136,7 +147,25 @@
         <label><span data-i18n="look.color"></span> <input type="color" data-option="color"></label>
         <label><span data-i18n="look.opacity"></span> <span class="slider"><input type="range" data-option="backgroundOpacity" min="0" max="100" step="5"><output></output></span></label>
         <label><span data-i18n="look.radius"></span> <span class="slider"><input type="range" data-option="radius" min="0" max="24"><output></output></span></label>
+        <div class="bg-image-row"><span data-i18n="look.bgImage"></span>
+          <span class="bg-image-actions"><span id="bgImageStatus" class="muted"></span>
+            <button type="button" id="bgImageChoose" data-i18n="look.bgImageChoose"></button>
+            <button type="button" id="bgImageRemove" data-i18n="look.bgImageRemove" hidden></button>
+            <input type="file" id="bgImageFile" accept="image/png,image/jpeg,image/gif,image/webp" hidden>
+          </span>
+        </div>
       </div>
+      <div class="fields bg-image-only">
+        <label><span data-i18n="look.bgImageOpacity"></span> <span class="slider"><input type="range" data-option="bgImageOpacity" min="0" max="100" step="5"><output></output></span></label>
+        <label><span data-i18n="look.bgImageFit"></span>
+          <select data-option="bgImageFit"><option value="cover" data-i18n="look.fitCover"></option><option value="contain" data-i18n="look.fitContain"></option><option value="stretch" data-i18n="look.fitStretch"></option><option value="tile" data-i18n="look.fitTile"></option><option value="scale" data-i18n="look.fitScale"></option></select>
+        </label>
+        <label><span data-i18n="look.bgImageScale"></span> <span class="slider"><input type="range" data-option="bgImageScale" min="10" max="400" step="5"><output></output></span></label>
+        <label><span data-i18n="look.bgImageX"></span> <span class="slider"><input type="range" data-option="bgImageX" min="0" max="100"><output></output></span></label>
+        <label><span data-i18n="look.bgImageY"></span> <span class="slider"><input type="range" data-option="bgImageY" min="0" max="100"><output></output></span></label>
+      </div>
+      <p class="note error" id="bgImageError"></p>
+      <p class="note" data-i18n="look.bgImageNote"></p>
     </section>
   </form>
   <section id="previewPane">

@@ -16,6 +16,8 @@ const PAGE_MS = 5000;
 const OWNERS = { jacob: { key: 'view.jacob', letter: 'J' }, esau: { key: 'view.esau', letter: 'E' } };
 const LABEL_ROOM = 6; // separación mínima entre el código de un piso y el del siguiente
 const FIT_ICON_SIZES = [32, 28, 24];
+// Solo si con 24 px y superpuestos no caben todos los objetos.
+const TINY_ICON_SIZES = [20, 16];
 // El banner usa el mayor tamaño que quepa, para aprovechar todo el espacio.
 const BANNER_ICON_SIZES = [96, 80, 64, 56, 48, 40, ...FIT_ICON_SIZES];
 
@@ -262,7 +264,9 @@ function itemTile(i, latest, hoverDesc) {
 
 function floorMark(i) {
   const mark = el('span', 'floor-mark' + (i.blind ? ' blind' : ''));
-  mark.append(el('span', 'floor-label', i.floorLabel + (i.blind ? ' ?' : '')));
+  const label = el('span', 'floor-label', i.floorLabel);
+  if (i.blind) label.append(el('span', 'blind-q', ' ?'));
+  mark.append(label);
   return mark;
 }
 
@@ -277,30 +281,44 @@ function shelfRow(s) {
   const latest = lastTaken(items);
   if (options.removed === 'hide') items = items.filter(i => !i.removed);
   if (options.maxItems) items = items.slice(-options.maxItems);
-  let floor = null;
+  // Si la maldición del ciego se quita a mitad de piso (Black Candle, Genesis), el piso se parte en dos tramos:
+  // lo tomado con ella ("D2 ?") y lo tomado después ("D2").
+  const groupOf = i => i.floor + (i.blind && options.blindMark !== 'none' ? '?' : '');
+  let group = null;
   for (const i of items) {
     const tile = itemTile(i, i === latest, options.hoverDesc);
     if (options.floorGroups) {
-      tile.dataset.floor = i.floor;
-      if (i.floor !== floor) tile.prepend(floorMark(i));
+      tile.dataset.floor = groupOf(i);
+      if (groupOf(i) !== group) tile.prepend(floorMark(i));
     }
-    floor = i.floor;
+    group = groupOf(i);
     wrap.append(tile);
   }
   return wrap;
 }
 
+// Píxeles que cada icono se mete bajo el siguiente cuando no caben todos (0 = sin superponer).
+let overlap = 0;
+function setOverlap(px) {
+  overlap = Math.round(px);
+  document.documentElement.style.setProperty('--overlap', overlap + 'px');
+}
+
 // El código del piso no ocupa ancho propio: solo se aparta el piso siguiente si el código no cabe sobre sus objetos.
+// Cada objeto lleva un margen derecho de -overlap; el último del piso lo amplía si hace falta sitio para el código.
 function spaceFloorLabels(shelf) {
   const tiles = [...shelf.querySelectorAll('.item[data-floor]')];
-  const pitch = () => tiles[0].offsetWidth + parseFloat(getComputedStyle(shelf).columnGap);
+  const pitch = () => tiles[0].offsetWidth + parseFloat(getComputedStyle(shelf).columnGap) - overlap;
   let count = 0;
+  const tight = shelf.classList.contains('tight');
   tiles.forEach((tile, n) => {
     tile.style.marginRight = '';
+    if (tight) return;
     count++;
     if (tiles[n + 1] && tiles[n + 1].dataset.floor === tile.dataset.floor) return;
     const label = tiles[n - count + 1].querySelector('.floor-label');
-    tile.style.marginRight = Math.max(0, label.offsetWidth + LABEL_ROOM - count * pitch()) + 'px';
+    const extra = Math.max(0, label.offsetWidth + LABEL_ROOM - count * pitch());
+    if (extra) tile.style.marginRight = extra - overlap + 'px';
     count = 0;
   });
 }
@@ -324,6 +342,48 @@ const TEXT_SCALE = {
 // Upheaval vale tanto incluida en app/ ("Upheaval") como instalada en Windows ("Upheaval TT (BRK)").
 const PIXEL_FONTS = /^Upheaval\b/i;
 
+// Imagen de fondo: en mosaico y en escala propia el tamaño parte del original, que se conoce al cargarla.
+const bgNatural = { key: '', width: 0, height: 0 };
+function bgSize(o) {
+  if (o.bgImageFit === 'cover' || o.bgImageFit === 'contain') return o.bgImageFit;
+  if (o.bgImageFit === 'stretch') return '100% 100%';
+  if (!bgNatural.width) return 'auto';
+  const k = o.bgImageScale / 100;
+  return `${Math.round(bgNatural.width * k)}px ${Math.round(bgNatural.height * k)}px`;
+}
+function bgImageVars(o) {
+  if (!o.bgImage) return { '--bg-image': 'none' };
+  const url = new URL('background?v=' + encodeURIComponent(o.bgImage), location.href).href;
+  if (bgNatural.key !== o.bgImage) {
+    Object.assign(bgNatural, { key: o.bgImage, width: 0, height: 0 });
+    const img = new Image();
+    img.onload = () => {
+      if (bgNatural.key !== o.bgImage) return;
+      Object.assign(bgNatural, { width: img.naturalWidth, height: img.naturalHeight });
+      document.documentElement.style.setProperty('--bg-size', bgSize(o));
+    };
+    img.src = url;
+  }
+  return {
+    '--bg-image': `url("${url}")`, '--bg-size': bgSize(o), '--bg-pos': `${o.bgImageX}% ${o.bgImageY}%`,
+    '--bg-repeat': o.bgImageFit === 'tile' ? 'repeat' : 'no-repeat', '--bg-image-opacity': o.bgImageOpacity / 100,
+  };
+}
+
+// Contorno de píxeles enteros alrededor de cada letra, como el texto del juego: una sombra por cada punto del anillo.
+function outlineShadow(color, size) {
+  const parts = [];
+  for (let x = -size; x <= size; x++) for (let y = -size; y <= size; y++) {
+    if ((x || y) && x * x + y * y <= size * size + size) parts.push(`${x}px ${y}px 0 ${color}`);
+  }
+  return parts.join(', ');
+}
+const WHO_SHADOW = {
+  none: () => 'var(--text-shadow)',
+  outline: o => outlineShadow(o.whoOutlineColor, o.whoOutlineSize),
+  glow: o => `0 0 ${o.whoOutlineSize}px ${o.whoOutlineColor}, 0 0 ${o.whoOutlineSize * 3}px ${o.whoOutlineColor}`,
+};
+
 function applyStyle(o) {
   const icon = { none: 'none', glow: `drop-shadow(0 0 3px ${o.accentColor})`, shadow: 'drop-shadow(1px 2px 1px #000)' };
   const vars = {
@@ -337,6 +397,8 @@ function applyStyle(o) {
     '--align': o.align, '--justify': JUSTIFY[o.align],
     '--bg': o.background === 'solid' ? o.color : o.background === 'brick' ? 'url(ladrillo.png)' : 'transparent',
     '--bg-opacity': o.backgroundOpacity / 100,
+    '--who-shadow': (WHO_SHADOW[o.whoOutline] || WHO_SHADOW.none)(o),
+    ...bgImageVars(o),
   };
   for (const [k, v] of Object.entries(vars)) document.documentElement.style.setProperty(k, v);
 }
@@ -346,6 +408,11 @@ function render(s) {
   applyStyle(options);
   document.body.classList.toggle('mark-latest', options.markItem === 'latest');
   document.body.classList.toggle('mark-hover', options.markItem === 'hover');
+  document.body.classList.toggle('who-highlight', options.whoOutline !== 'none');
+  // Maldición del ciego: por defecto solo en el separador del piso. Sin separadores, se marca cada objeto para no perder el dato.
+  const blind = options.blindMark === 'floor' && !options.floorGroups ? 'items' : options.blindMark;
+  document.body.classList.toggle('blind-items', blind === 'items');
+  document.body.classList.toggle('blind-none', blind === 'none');
   if (!options.hoverDesc) hideTip();
   const banner = options.layout === 'banner';
   view.className = banner ? 'banner' : 'wide';
@@ -368,21 +435,44 @@ function render(s) {
   fitShelf(options);
 }
 
-// Elige el tamaño de los iconos y, si aun así no caben todos los objetos, conserva los más recientes
-// con un contador de los que no se ven. Unas filas elegidas a mano se respetan aunque no quepan en la ventana.
+// Elige el mayor tamaño de icono en el que caben todos los objetos. Si no caben ni en el más pequeño, los superpone
+// lo justo para que se vea la lista entera en la misma ventana, dejando visible al menos SHOW_MIN de cada icono.
+// Solo si ni así caben, conserva los más recientes con un contador de los que no se ven.
+// Unas filas elegidas a mano se respetan aunque no quepan en la ventana.
+const SHOW_MIN = 0.35;
 function fitShelf({ padding, iconAuto, iconSize, layout, rows }) {
+  setOverlap(0);
   const shelf = view.querySelector('.shelf');
   if (!shelf) return;
   const room = window.innerHeight - padding * 2;
   const rowCount = () => new Set([...shelf.children].map(c => c.offsetTop)).size;
   const fits = () => view.offsetHeight <= room && (!rows || rowCount() <= rows);
+  const tryLayout = (size, share) => {
+    document.documentElement.style.setProperty('--icon', size + 'px');
+    setOverlap(size * share);
+    spaceFloorLabels(shelf);
+    return fits();
+  };
   let sizes = [iconSize];
   if (iconAuto) sizes = layout === 'banner' ? BANNER_ICON_SIZES.filter(size => size <= room) : [iconSize, ...FIT_ICON_SIZES.filter(size => size < iconSize)];
-  for (const size of sizes) {
-    iconSize = size;
-    document.documentElement.style.setProperty('--icon', size + 'px');
-    spaceFloorLabels(shelf);
-    if (fits()) return;
+  if (!sizes.length) sizes = [FIT_ICON_SIZES[FIT_ICON_SIZES.length - 1]];
+  for (const size of sizes) if (tryLayout(size, 0)) return;
+  // En el tamaño más pequeño: la menor superposición que haga caber todo.
+  const smallest = sizes[sizes.length - 1];
+  const gap = parseFloat(getComputedStyle(shelf).columnGap) || 0;
+  const most = Math.floor(smallest * (1 - SHOW_MIN) + gap);
+  for (let px = 1; px <= most; px++) if (tryLayout(smallest, px / smallest)) return;
+  // Sin los códigos de piso, que obligan a separar los pisos, caben muchos más.
+  if (shelf.querySelector('.floor-label')) {
+    shelf.classList.add('tight');
+    for (let px = 0; px <= most; px++) if (tryLayout(smallest, px / smallest)) return;
+  }
+  // Iconos aún más pequeños (16 px es el tamaño original del sprite) dejan sitio para otra fila.
+  if (iconAuto) {
+    for (const size of TINY_ICON_SIZES.filter(s => s < smallest)) {
+      const limit = Math.floor(size * (1 - SHOW_MIN) + gap);
+      for (let px = 0; px <= limit; px++) if (tryLayout(size, px / size)) return;
+    }
   }
   // Si ni una fila cabe entera, se deja una: vaciar la estantería no arreglaría nada.
   const tooMany = () => (rows ? rowCount() > rows : view.offsetHeight > room && rowCount() > 1);

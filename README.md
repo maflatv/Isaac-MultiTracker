@@ -23,7 +23,7 @@ El ejecutable no tiene firma digital, así que Windows puede mostrar un aviso. P
 ## Uso
 
 - **Configurar:** el panel permite elegir el guardado, el idioma, qué se muestra y la apariencia. Los cambios se aplican al momento y se conservan al cerrar el programa.
-- **Ventana del tracker:** el botón **Abrir en ventana** abre el tracker en una ventana de 900×121. MultiTracker recuerda dónde dejaste cada ventana.
+- **Ventana del tracker:** el botón **Abrir en ventana** abre el tracker en su propia ventana, de 900×121 por defecto. Puedes estirarla o escribir el ancho y el alto en **Distribución**; el tamaño y la posición se recuerdan.
 - **OBS:** añade la ventana «MultiTracker · Tracker» con una **Captura de ventana**. Si prefieres una fuente de navegador, activa en el panel **Permitir la vista como fuente de navegador en OBS** y usa http://localhost:7374/overlay.html. Esa opción es la única que abre un puerto, y solo en tu PC.
 
 ## Idiomas
@@ -43,12 +43,15 @@ Requiere [Node.js](https://nodejs.org) 24. Las herramientas de compilación (Ele
 
 ## Qué muestra
 
-- **Objetos de la partida:** separados por piso con códigos como `B1`, `C2`, `Do1`, `BXL` o `CATH`. Los tomados bajo la maldición del ciego llevan una marca.
+- **Objetos de la partida:** separados por piso con códigos como `B1`, `C2`, `Do1`, `BXL` o `CATH`. Los pisos con la maldición del ciego llevan su separador en otro color y un «?» tras el código. En **Iconos → Maldición del ciego** puedes marcar también cada objeto o no marcar nada. Si el Black Candle o Genesis quitan la maldición a mitad de piso, lo tomado después se muestra como un tramo normal del mismo piso. La runa Dagaz también la quita, pero el juego no registra en `log.txt` qué carta se usa, así que en ese caso el piso sigue marcado.
 - **Solo lo que el personaje posee:** los rerolls (D4, D100, sala de dados...) y Genesis quitan lo perdido.
 - **Jacob y Esaú:** cada objeto indica quién lo lleva.
+- **La lista completa en la misma ventana:** si los objetos no caben, los iconos se superponen un poco. En partidas muy largas también se ocultan los códigos de piso, aunque se mantienen sus líneas, y se usan iconos más pequeños. Al pasar el puntero, el icono se ve entero.
 - **Objeto recién tomado:** se destaca con una animación durante unos segundos.
 - **Descripción al pasar el puntero:** en la ventana del tracker, el objeto bajo el puntero se marca y su nombre, descripción y piso aparecen en una franja. En el panel puedes elegir qué objeto se marca: el que está bajo el puntero, el último tomado o ninguno.
 - **Cualquier fuente instalada:** el campo **Fuente** del panel sugiere las fuentes instaladas en tu PC.
+- **Personaje, seed y racha resaltados:** llevan un contorno negro alrededor de cada letra, como el texto del juego. En **Texto** puedes cambiarlo por un brillo o quitarlo, y elegir su color y su grosor.
+- **Imagen de fondo:** en **Fondo** puedes elegir una imagen PNG, JPG, GIF o WebP de hasta 10 MB y ajustar su opacidad, su tamaño (llenar, ajustar, estirar, mosaico o escala propia) y su posición. MultiTracker guarda una copia en `userdata/`.
 - **Progreso hacia Dead God:** logros, colección, marcas, retos y racha actual. En un guardado al 100% solo se muestra la racha.
 - **Tiempo de juego por archivo:** MultiTracker suma el tiempo de cada partida al guardado en el que se juega y lo muestra en el panel, junto a cada archivo. En la vista puedes activar **Tiempo en este archivo** y **Tiempo de la partida**. El juego no guarda este dato: se cuenta con el contador de frames que escribe en `log.txt`, así que no incluye menús ni pausas, y solo se registra desde que usas MultiTracker. Ábrelo en cada sesión de juego: no hace falta que esté abierto todo el rato, pero sí antes de volver a abrir el juego, que vacía el log al arrancar. Continuar una partida suma también lo jugado antes en ella.
 - **Logros como iconos:** los contadores y los logros vigilados se muestran con los iconos de sus logros de Steam, con una ✓ en los conseguidos. MultiTracker sabe qué icono corresponde a cada logro por el esquema que Steam guarda en tu PC (`appcache/stats`), descarga cada imagen una vez de la CDN de Steam y la guarda en `userdata/cache/achievements/`. Sin conexión, o eligiendo **Texto y barras** en el panel, se muestran con texto.
@@ -65,7 +68,7 @@ MultiTracker busca sola las carpetas, incluidas otras bibliotecas de Steam. Si n
 | `gameDir` | La que contiene `log.txt`, en `Documents/My Games/Binding of Isaac Repentance+` |
 | `steamUserdata` | `userdata` de Steam, donde están los guardados |
 
-El archivo debe estar junto a `MultiTracker.exe`. Tus ajustes se guardan en `userdata/`, también junto a él: `config.json` (guardado, idioma, opciones y apariencia), `windows.json` (posición de las ventanas) y `playtime.json` (tiempo de juego de cada archivo). Si mueves `MultiTracker.exe`, lleva `userdata/` con él: el tiempo registrado no se puede volver a calcular.
+El archivo debe estar junto a `MultiTracker.exe`. Tus ajustes se guardan en `userdata/`, también junto a él: `config.json` (guardado, idioma, opciones y apariencia), `windows.json` (posición de las ventanas), `playtime.json` (tiempo de juego de cada archivo) y, si eliges una, `background.*` (la imagen de fondo). Si mueves `MultiTracker.exe`, lleva `userdata/` con él: el tiempo registrado no se puede volver a calcular.
 
 ## Fuente Upheaval (opcional)
 

@@ -23,6 +23,8 @@ const MAX_SAVE_BYTES = 1024 * 1024;
 // Lo que cambian los temas del panel; el resto de opciones no les afecta.
 const APPEARANCE = {
   font: 'Upheaval', fontSize: 20, bold: true, textEffect: 'shadow',
+  // Resaltado de la línea del personaje (personaje, piso, seed, racha...): contorno o brillo alrededor de cada letra.
+  whoOutline: 'outline', whoOutlineColor: '#000000', whoOutlineSize: 2,
   textColor: '#f0e4d8', accentColor: '#f0ad4e', doneColor: '#8fd18f',
   blindColor: '#c77dff',
   iconGap: 2, iconEffect: 'none',
@@ -39,15 +41,36 @@ const DEFAULTS = {
   show: { character: true, seed: true, floor: true, runTime: false, items: true, description: false, transforms: true, playtime: false, achievements: true, collection: true, winStreak: true, marksHard: false, marksAny: false, challenges: false },
   goals: [],
   watched: [],
-  options: { ...APPEARANCE, layout: 'banner', iconAuto: true, iconSize: 40, rows: 0, maxItems: 0, removed: 'hide', markItem: 'hover', hoverDesc: true, progressStyle: 'icons', pendingLook: 'color', hideDone: false, floorGroups: true, transformsClose: true, highlight: true, highlightSeconds: 5 },
+  options: {
+    ...APPEARANCE, layout: 'banner', iconAuto: true, iconSize: 40, rows: 0, maxItems: 0, removed: 'hide', markItem: 'hover', hoverDesc: true, progressStyle: 'icons', pendingLook: 'color', hideDone: false, floorGroups: true, transformsClose: true, highlight: true, highlightSeconds: 5,
+    // Tamaño del área útil de la ventana del tracker: por defecto, el de la ventana de Rebirth Item Tracker.
+    viewWidth: 900, viewHeight: 121,
+    // Maldición del ciego: 'floor' solo en el separador del piso, 'items' también en cada objeto, 'none' sin marca.
+    blindMark: 'floor',
+    // Imagen de fondo propia, aparte de los temas. bgImage: "<extensión>:<marca de tiempo>" o '' sin imagen; solo la cambia /api/background.
+    bgImage: '', bgImageOpacity: 100, bgImageFit: 'cover', bgImageScale: 100, bgImageX: 50, bgImageY: 50,
+  },
 };
-const LIMITS = { iconSize: [16, 96], rows: [0, 8], maxItems: [0, 200], highlightSeconds: [2, 20], fontSize: [10, 32], iconGap: [0, 16], rowGap: [0, 24], padding: [0, 32], radius: [0, 24], backgroundOpacity: [0, 100] };
+const LIMITS = {
+  iconSize: [16, 96], rows: [0, 8], maxItems: [0, 200], highlightSeconds: [2, 20], fontSize: [10, 32], iconGap: [0, 16], rowGap: [0, 24], padding: [0, 32], radius: [0, 24], backgroundOpacity: [0, 100],
+  viewWidth: [200, 3840], viewHeight: [60, 2160], whoOutlineSize: [1, 4], bgImageOpacity: [0, 100], bgImageScale: [10, 400], bgImageX: [0, 100], bgImageY: [0, 100],
+};
 const CHOICES = {
   layout: ['banner', 'wide'], removed: ['dim', 'hide'], markItem: ['none', 'latest', 'hover'], background: ['transparent', 'solid', 'brick'], textEffect: ['none', 'shadow', 'outline'],
   iconEffect: ['none', 'glow', 'shadow'], progressStyle: ['icons', 'text'], pendingLook: ['color', 'gray'], align: ['left', 'center', 'right'], itemsPosition: ['above', 'below'],
+  bgImageFit: ['cover', 'contain', 'stretch', 'tile', 'scale'], blindMark: ['floor', 'items', 'none'],
+  whoOutline: ['none', 'outline', 'glow'],
+};
+// Imagen de fondo: se reconoce por sus primeros bytes, no por lo que diga quien la envía.
+const BG_IMAGE_MAX_BYTES = 10 * 1024 * 1024;
+const BG_IMAGE_TYPES = {
+  png: { mime: 'image/png', test: b => b.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])) },
+  jpg: { mime: 'image/jpeg', test: b => b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff },
+  gif: { mime: 'image/gif', test: b => /^GIF8[79]a$/.test(b.subarray(0, 6).toString('latin1')) },
+  webp: { mime: 'image/webp', test: b => b.subarray(0, 4).toString('latin1') === 'RIFF' && b.subarray(8, 12).toString('latin1') === 'WEBP' },
 };
 const FLAGS = ['iconAuto', 'hideDone', 'floorGroups', 'transformsClose', 'bold', 'highlight', 'hoverDesc'];
-const COLORS = ['color', 'textColor', 'accentColor', 'doneColor', 'blindColor'];
+const COLORS = ['color', 'textColor', 'accentColor', 'doneColor', 'blindColor', 'whoOutlineColor'];
 // El nombre de la fuente acaba en CSS entre comillas dobles: se admiten los caracteres de los nombres de fuentes
 // instaladas (letras, números, espacios, guiones, puntos, paréntesis, &, + y apóstrofos), nunca comillas dobles ni barras.
 const FONT_NAME = /^[\p{L}\p{N} _\-.&+'()]{1,60}$/u;
@@ -260,6 +283,46 @@ function createTracker({ resDir, gameDir, steamUserdata, dataDir }, options = {}
     };
   }
 
+  function writeConfig(cfg) {
+    writeFile(CONFIG_FILE, JSON.stringify(cfg, null, 2));
+    if (options.onConfig) options.onConfig(cfg);
+    return cfg;
+  }
+
+  // ---------- Imagen de fondo ----------
+  // Se guarda una copia en userdata/ como background.<extensión>: así no depende de dónde estuviera la original.
+  const bgFile = ext => path.join(dataDir, 'background.' + ext);
+  function setBackground(b) {
+    let buf = null, ext = '';
+    if (!b.remove) {
+      // Se comprueba antes de tocar nada: una imagen que no sirve no borra la que ya había.
+      const m = /^data:[\w/+.-]*;base64,([A-Za-z0-9+/=]+)$/.exec(typeof b.data === 'string' ? b.data : '');
+      buf = m ? Buffer.from(m[1], 'base64') : null;
+      ext = (buf && buf.length <= BG_IMAGE_MAX_BYTES && Object.keys(BG_IMAGE_TYPES).find(k => BG_IMAGE_TYPES[k].test(buf))) || '';
+      if (!ext) throw new UserError('err.bgImage');
+    }
+    for (const other of Object.keys(BG_IMAGE_TYPES)) if (other !== ext) fs.rmSync(bgFile(other), { force: true });
+    if (ext) writeFile(bgFile(ext), buf);
+    const cfg = loadConfig();
+    cfg.options.bgImage = ext ? `${ext}:${Date.now()}` : '';
+    return writeConfig(cfg);
+  }
+  function background() {
+    const ext = loadConfig().options.bgImage.split(':')[0];
+    if (!BG_IMAGE_TYPES[ext]) return json(404, { error: 'No background' });
+    try { return { status: 200, type: BG_IMAGE_TYPES[ext].mime, body: fs.readFileSync(bgFile(ext)) }; } catch { return json(404, { error: 'No background' }); }
+  }
+
+  // La ventana del tracker guarda aquí su tamaño cuando el usuario la estira. No avisa a onConfig: ya tiene ese tamaño.
+  function setViewSize(width, height) {
+    const cfg = loadConfig();
+    const [w, h] = [[width, LIMITS.viewWidth], [height, LIMITS.viewHeight]].map(([v, [min, max]]) => Math.min(max, Math.max(min, Math.round(v))));
+    if (cfg.options.viewWidth === w && cfg.options.viewHeight === h) return;
+    cfg.options.viewWidth = w;
+    cfg.options.viewHeight = h;
+    writeFile(CONFIG_FILE, JSON.stringify(cfg, null, 2));
+  }
+
   const json = (status, body) => ({ status, type: MIME['.json'], body: JSON.stringify(body) });
   const file = (buf, rel) => (buf ? { status: 200, type: MIME[path.extname(rel).toLowerCase()] || 'application/octet-stream', body: buf } : json(404, { error: 'Not found' }));
 
@@ -278,17 +341,16 @@ function createTracker({ resDir, gameDir, steamUserdata, dataDir }, options = {}
     if (method === 'GET' && pathname === '/api/fonts') return json(200, { fonts: await listFonts() });
     // Exigir JSON impide que una página web cualquiera lance estas acciones contra el servidor local.
     if (method === 'POST' && !String(contentType).startsWith('application/json')) return json(415, { error: 'Expected JSON' });
-    if (method === 'POST' && pathname === '/api/config') {
+    if (method === 'POST' && (pathname === '/api/config' || pathname === '/api/background')) {
       try {
-        const cfg = sanitizeConfig(await readJsonBody());
-        writeFile(CONFIG_FILE, JSON.stringify(cfg, null, 2));
-        if (options.onConfig) options.onConfig(cfg);
-        return json(200, cfg);
+        const body = await readJsonBody();
+        return json(200, pathname === '/api/config' ? writeConfig(sanitizeConfig(body)) : setBackground(body));
       } catch (e) {
         if (e instanceof UserError) return json(400, { error: T(e.key, e.vars) });
         throw e;
       }
     }
+    if (method === 'GET' && pathname === '/background') return background();
     if (method === 'POST' && pathname === '/api/pick-save') {
       return json(200, { path: await choosePath(steamUserdata, { title: T('picker.title'), filter: T('picker.filter'), all: T('picker.all') }) });
     }
@@ -312,7 +374,7 @@ function createTracker({ resDir, gameDir, steamUserdata, dataDir }, options = {}
     send(res, r.status, r.body, r.type, r.cache);
   }
 
-  return { respond, handle, config: loadConfig, language: () => languageOf(loadConfig()), T };
+  return { respond, handle, config: loadConfig, setViewSize, language: () => languageOf(loadConfig()), T };
 }
 
 module.exports = { createTracker };

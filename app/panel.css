@@ -27,6 +27,11 @@ main { display: grid; grid-template-columns: 400px 1fr; height: calc(100% - 45px
 .fields label { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .fields.spaced { margin: 8px 0 0; }
 .fields input[type=number] { width: 70px; }
+.bg-image-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.bg-image-actions { display: flex; align-items: center; gap: 6px; }
+.muted { color: var(--muted); }
+.fields label:has(:disabled) > span:first-child { opacity: .5; }
+.slider output { min-width: 24px; width: auto; }
 .note { color: var(--muted); font-size: 12px; margin: 6px 0 0; min-height: 1em; }
 .note.error { color: #ff9f9a; }
 #previewPane { display: flex; flex-direction: column; padding: 10px; min-width: 0; }
