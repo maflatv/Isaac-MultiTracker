@@ -69,6 +69,15 @@ const BG_IMAGE_TYPES = {
   gif: { mime: 'image/gif', test: b => /^GIF8[79]a$/.test(b.subarray(0, 6).toString('latin1')) },
   webp: { mime: 'image/webp', test: b => b.subarray(0, 4).toString('latin1') === 'RIFF' && b.subarray(8, 12).toString('latin1') === 'WEBP' },
 };
+// Cabeza de quien lleva cada objeto, de los recursos extraídos del juego: la hoja del personaje (su primer cuadro es la
+// cabeza de frente, 32x32) y la del pelo (primer cuadro de 64x64, con la cabeza en el centro).
+const COSTUMES = path.join('gfx', 'characters', 'costumes');
+const OWNER_SPRITES = {
+  lazarus: { head: 'character_009b_lazarus.png', hair: 'character_009b_lazarushair.png' },
+  lazarus_dead: { head: 'character_009b_lazarus2.png', hair: 'character_009b_lazarus2hair.png' },
+  jacob: { head: 'character_002x_jacob.png', hair: 'character_002x_jacobhair.png' },
+  esau: { head: 'character_003x_esau.png', hair: 'character_003x_esauhair.png' },
+};
 const FLAGS = ['iconAuto', 'hideDone', 'floorGroups', 'transformsClose', 'bold', 'highlight', 'hoverDesc'];
 const COLORS = ['color', 'textColor', 'accentColor', 'doneColor', 'blindColor', 'whoOutlineColor'];
 // El nombre de la fuente acaba en CSS entre comillas dobles: se admiten los caracteres de los nombres de fuentes
@@ -356,6 +365,9 @@ function createTracker({ resDir, gameDir, steamUserdata, dataDir }, options = {}
     }
     let m;
     if (method === 'GET' && (m = /^\/icon\/item\/(\d+)\.png$/.exec(pathname))) return icon(gameData().icons.get(+m[1]));
+    if (method === 'GET' && (m = /^\/icon\/owner\/(\w+)\/(head|hair)\.png$/.exec(pathname)) && Object.hasOwn(OWNER_SPRITES, m[1])) {
+      return icon(path.join(COSTUMES, OWNER_SPRITES[m[1]][m[2]]));
+    }
     if (method === 'GET' && (m = /^\/icon\/achievement\/(\d+)\.jpg$/.exec(pathname))) {
       const img = await achievementIcons.get(+m[1]);
       return img ? { status: 200, type: 'image/jpeg', body: img, cache: true } : json(404, { error: 'No icon' });

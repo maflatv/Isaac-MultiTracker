@@ -12,8 +12,37 @@ const NEW_RUN_GRACE_MS = 2000;
 // Tiempo de cada página cuando el progreso no cabe en el lateral del banner.
 const PAGE_MS = 5000;
 // Antes de ocultar objetos se prueban iconos más pequeños.
-// La letra es la del nombre en inglés, como en el juego; el nombre completo sale traducido.
-const OWNERS = { jacob: { key: 'view.jacob', letter: 'J' }, esau: { key: 'view.esau', letter: 'E' } };
+// Quién lleva el objeto: su cabeza, sacada de los recursos del juego, o una letra si no están. La letra es la del
+// nombre en inglés, como en el juego (D de Dead para el Lázaro muerto); el nombre completo sale traducido.
+const OWNERS = {
+  jacob: { key: 'view.jacob', letter: 'J' }, esau: { key: 'view.esau', letter: 'E' },
+  lazarus: { key: 'view.lazarus', letter: 'L' }, lazarus_dead: { key: 'view.lazarusDead', letter: 'D' },
+};
+// owner -> 'loading' | 'ok' | 'fail'. Se comprueba una vez si están las dos hojas; al cargarse se vuelve a dibujar.
+const ownerArt = {};
+function hasOwnerArt(owner) {
+  if (!(owner in ownerArt)) {
+    ownerArt[owner] = 'loading';
+    let left = 2;
+    for (const part of ['head', 'hair']) {
+      const img = new Image();
+      img.onload = () => { if (--left === 0 && ownerArt[owner] === 'loading') { ownerArt[owner] = 'ok'; if (current) render(current); } };
+      img.onerror = () => { ownerArt[owner] = 'fail'; };
+      img.src = `icon/owner/${owner}/${part}.png`;
+    }
+  }
+  return ownerArt[owner] === 'ok';
+}
+function ownerBadge(owner) {
+  if (!hasOwnerArt(owner)) return el('span', 'owner-badge ' + owner, OWNERS[owner].letter);
+  const b = el('span', 'owner-badge art ' + owner);
+  for (const part of ['head', 'hair']) {
+    const layer = el('i', part);
+    layer.style.backgroundImage = `url(icon/owner/${owner}/${part}.png)`;
+    b.append(layer);
+  }
+  return b;
+}
 const LABEL_ROOM = 6; // separación mínima entre el código de un piso y el del siguiente
 const FIT_ICON_SIZES = [32, 28, 24];
 // Solo si con 24 px y superpuestos no caben todos los objetos.
@@ -257,7 +286,7 @@ function itemTile(i, latest, hoverDesc) {
   const owner = OWNERS[i.owner];
   if (owner) {
     if (t.title) t.title += ' — ' + tr(owner.key);
-    t.append(el('span', 'owner-badge ' + i.owner, owner.letter));
+    t.append(ownerBadge(i.owner));
   }
   return t;
 }

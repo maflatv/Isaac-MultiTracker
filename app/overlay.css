@@ -85,10 +85,17 @@ body.highlighting #view { opacity: 0; }
 .blind-none .floor-mark.blind .floor-label { color: inherit; }
 .blind-none .blind-q { display: none; }
 .blind-items .item.blind::after { content: '?'; position: absolute; top: 1px; right: 1px; width: 13px; height: 13px; border-radius: 50%; background: var(--blind); color: #000; font: 700 10px/13px system-ui, sans-serif; text-align: center; text-shadow: none; }
-/* Quién lleva el objeto con Jacob y Esaú */
+/* Quién lleva el objeto con Jacob y Esaú o con Tainted Lazarus. Sin los recursos del juego, una letra. */
 .owner-badge { position: absolute; left: 1px; bottom: 1px; width: 13px; height: 13px; border-radius: 3px; color: #000; font: 700 10px/13px system-ui, sans-serif; text-align: center; text-shadow: none; }
-.owner-badge.jacob { background: #6cc4ff; }
+.owner-badge.jacob, .owner-badge.lazarus { background: #6cc4ff; }
 .owner-badge.esau { background: #ff8a6c; }
+.owner-badge.lazarus_dead { background: #b3343f; }
+/* Con los recursos: la cabeza del personaje sobre un círculo de su color, que crece con el icono.
+   Se ve la zona central de 48 px del cuadro de 64 del pelo; la cabeza (32 px) va en el centro de ese cuadro. */
+.owner-badge.art { --badge: max(13px, calc(var(--icon) * .45)); left: 0; bottom: 0; width: var(--badge); height: var(--badge); border-radius: 50%; overflow: hidden; box-shadow: 0 0 0 1px #000; }
+.owner-badge.art i { position: absolute; background-repeat: no-repeat; background-position: 0 0; image-rendering: pixelated; }
+.owner-badge.art .head { left: calc(var(--badge) / 6); top: calc(var(--badge) / 6); width: calc(var(--badge) * 2 / 3); height: calc(var(--badge) * 2 / 3); background-size: 1600% 1600%; }
+.owner-badge.art .hair { left: calc(var(--badge) / -6); top: calc(var(--badge) / -6); width: calc(var(--badge) * 4 / 3); height: calc(var(--badge) * 4 / 3); background-size: 800% 100%; }
 /* Marca opcional: el último objeto tomado o el que está bajo el puntero */
 .mark-latest .item.latest, .mark-hover .item:not(.more):hover { box-shadow: inset 0 0 0 2px var(--accent); }
 .mark-latest .item.fresh { animation: fresh-pulse .7s ease-out 2; }

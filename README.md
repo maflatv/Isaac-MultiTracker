@@ -45,7 +45,7 @@ Requiere [Node.js](https://nodejs.org) 24. Las herramientas de compilación (Ele
 
 - **Objetos de la partida:** separados por piso con códigos como `B1`, `C2`, `Do1`, `BXL` o `CATH`. Los pisos con la maldición del ciego llevan su separador en otro color y un «?» tras el código. En **Iconos → Maldición del ciego** puedes marcar también cada objeto o no marcar nada. Si el Black Candle o Genesis quitan la maldición a mitad de piso, lo tomado después se muestra como un tramo normal del mismo piso. La runa Dagaz también la quita, pero el juego no registra en `log.txt` qué carta se usa, así que en ese caso el piso sigue marcado.
 - **Solo lo que el personaje posee:** los rerolls (D4, D100, sala de dados...) y Genesis quitan lo perdido.
-- **Jacob y Esaú:** cada objeto indica quién lo lleva.
+- **Jacob y Esaú, y Tainted Lazarus:** cada objeto indica quién lo lleva, con la cabeza del personaje sobre un círculo de su color (o una letra si faltan los recursos del juego). Con Tainted Lazarus se sigue cada cambio de forma, al limpiar una sala o con Flip, y un reroll solo cambia los objetos de la forma activa.
 - **La lista completa en la misma ventana:** si los objetos no caben, los iconos se superponen un poco. En partidas muy largas también se ocultan los códigos de piso, aunque se mantienen sus líneas, y se usan iconos más pequeños. Al pasar el puntero, el icono se ve entero.
 - **Objeto recién tomado:** se destaca con una animación durante unos segundos.
 - **Descripción al pasar el puntero:** en la ventana del tracker, el objeto bajo el puntero se marca y su nombre, descripción y piso aparecen en una franja. En el panel puedes elegir qué objeto se marca: el que está bajo el puntero, el último tomado o ninguno.
