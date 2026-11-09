@@ -6,12 +6,14 @@ Pon MultiTracker.exe en su propia carpeta: tus ajustes se guardarán junto a él
 Put MultiTracker.exe in its own folder: your settings are saved next to it.
 Hace falta The Binding of Isaac: Repentance+ en Steam, en Windows de 64 bits.
 
-1. En la carpeta del juego en Steam, ejecuta una vez
-   tools\ResourceExtractor\ResourceExtractor.exe
-   (Run it once, in the game's Steam folder.)
-2. Abre MultiTracker.exe. Es portable: no se instala ni usa un servidor.
+1. Abre MultiTracker.exe. Es portable: no se instala ni usa un servidor.
    (Open MultiTracker.exe. It is portable: no installation, no server.)
-3. Elige tu guardado y tu idioma en el panel. El idioma por defecto es el inglés.
+   La primera vez extrae de tu copia del juego los iconos y nombres que usa.
+   Tarda unos minutos y necesita 1,5 GB libres temporales; guarda solo 5 MB.
+   (On first launch it extracts the icons and names it uses from your copy
+   of the game. It takes a few minutes and needs 1.5 GB of temporary free
+   space; it keeps only 5 MB.)
+2. Elige tu guardado y tu idioma en el panel. El idioma por defecto es el inglés.
    (Choose your save and language in the panel. English is the default.)
 
 OBS

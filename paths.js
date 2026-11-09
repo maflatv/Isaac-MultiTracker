@@ -3,6 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const { execFileSync } = require('child_process');
 const { readJson } = require('./lib/http.js');
+const { isComplete } = require('./lib/resources.js');
 
 const GAME_FOLDER = path.join('steamapps', 'common', 'The Binding of Isaac Rebirth');
 const SAVE_FOLDER = path.join('My Games', 'Binding of Isaac Repentance+');
@@ -26,12 +27,11 @@ function steamLibraries(steam) {
   } catch { return [steam]; }
 }
 
-function findResources(steam) {
-  for (const lib of steamLibraries(steam)) {
-    const dir = path.join(lib, GAME_FOLDER, 'extracted_resources', 'resources');
-    if (fs.existsSync(path.join(dir, 'items.xml'))) return dir;
-  }
-  return null;
+// Carpeta donde está instalado el juego (la que tiene tools/ResourceExtractor), en cualquier biblioteca de Steam.
+function findIsaac(steam) {
+  const dirs = steamLibraries(steam).map(lib => path.join(lib, GAME_FOLDER));
+  return dirs.find(d => fs.existsSync(path.join(d, 'tools', 'ResourceExtractor', 'ResourceExtractor.exe')))
+    || dirs.find(d => fs.existsSync(d)) || null;
 }
 
 function findSaveDir() {
@@ -51,16 +51,25 @@ function activeSteamAccount() {
   } catch { return null; }
 }
 
+// Recursos del juego, por orden: la carpeta indicada en multitracker.config.json, la copia propia de MultiTracker
+// (userdata/resources, la que se crea al extraerlos) y la que deja el ResourceExtractor en la carpeta del juego.
+// Solo vale una carpeta completa. Si ninguna lo está, resDir es null y hay que extraerlos en ownResDir.
 function resolvePaths(baseDir) {
   const own = readJson(path.join(baseDir, 'multitracker.config.json'), {});
   const steam = steamDir();
-  const resDir = own.resourcesDir || findResources(steam);
+  const dataDir = path.join(baseDir, 'userdata');
+  const isaacDir = own.isaacDir || findIsaac(steam);
+  const ownResDir = path.join(dataDir, 'resources');
+  const candidates = [own.resourcesDir, ownResDir, isaacDir && path.join(isaacDir, 'extracted_resources', 'resources')];
+  const resDir = candidates.find(d => d && isComplete(d));
   return {
     // Rutas normalizadas: safeJoin compara prefijos y en el archivo pueden venir con "/".
-    resDir: resDir && path.resolve(resDir),
+    resDir: resDir ? path.resolve(resDir) : null,
+    ownResDir,
+    isaacDir: isaacDir && path.resolve(isaacDir),
     gameDir: path.resolve(own.gameDir || findSaveDir()),
     steamUserdata: path.resolve(own.steamUserdata || path.join(steam, 'userdata')),
-    dataDir: path.join(baseDir, 'userdata'),
+    dataDir,
   };
 }
 

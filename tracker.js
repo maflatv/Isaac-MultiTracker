@@ -8,6 +8,7 @@ const { activeSteamAccount } = require('./paths.js');
 const { listFonts } = require('./lib/fonts.js');
 const { RunLog } = require('./lib/log.js');
 const { createAchievementIcons } = require('./lib/steamicons.js');
+const { COSTUMES, OWNER_SPRITES } = require('./lib/resources.js');
 const { SaveError, parseSave, summarize, listSaves, COUNTER_GOALS, WATCHED_ACHIEVEMENTS } = require('./lib/save.js');
 const { loadGameData, floorLabel, TRANSFORMS, TRANSFORM_GOAL } = require('./lib/gamedata.js');
 const { LANGUAGES, resolve: resolveLanguage, t } = require('./app/i18n.js');
@@ -83,15 +84,6 @@ const BG_IMAGE_TYPES = {
   jpg: { mime: 'image/jpeg', test: b => b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff },
   gif: { mime: 'image/gif', test: b => /^GIF8[79]a$/.test(b.subarray(0, 6).toString('latin1')) },
   webp: { mime: 'image/webp', test: b => b.subarray(0, 4).toString('latin1') === 'RIFF' && b.subarray(8, 12).toString('latin1') === 'WEBP' },
-};
-// Cabeza de quien lleva cada objeto, de los recursos extraídos del juego: la hoja del personaje (su primer cuadro es la
-// cabeza de frente, 32x32) y la del pelo (primer cuadro de 64x64, con la cabeza en el centro).
-const COSTUMES = path.join('gfx', 'characters', 'costumes');
-const OWNER_SPRITES = {
-  lazarus: { head: 'character_009b_lazarus.png', hair: 'character_009b_lazarushair.png' },
-  lazarus_dead: { head: 'character_009b_lazarus2.png', hair: 'character_009b_lazarus2hair.png' },
-  jacob: { head: 'character_002x_jacob.png', hair: 'character_002x_jacobhair.png' },
-  esau: { head: 'character_003x_esau.png', hair: 'character_003x_esauhair.png' },
 };
 const FLAGS = ['iconAuto', 'hideDone', 'floorGroups', 'transformsClose', 'bold', 'highlight', 'hoverDesc', 'ownerBadgeBg', 'sideAuto'];
 const COLORS = ['color', 'textColor', 'accentColor', 'doneColor', 'blindColor', 'whoOutlineColor'];
