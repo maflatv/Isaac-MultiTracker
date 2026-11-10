@@ -14,6 +14,14 @@ h2 { font-size: 13px; margin: 0 0 8px; }
 button, select, input { font: inherit; color: var(--text); background: var(--panel2); border: 1px solid var(--line); border-radius: 4px; padding: 4px 8px; }
 button { cursor: pointer; } button:hover { border-color: var(--accent2); }
 button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+/* Aviso de versión nueva (solo en la versión instalada), bajo la barra superior. */
+.update-bar { display: flex; align-items: center; gap: 10px; padding: 6px 14px; background: var(--panel2); border-bottom: 1px solid var(--accent2); }
+.update-bar[hidden] { display: none; }
+.update-bar span { flex: 1; }
+.update-bar.error { border-bottom-color: #ff9f9a; color: #ff9f9a; }
+.update-check { display: flex; align-items: center; gap: 8px; margin: 6px 0 0; }
+.update-check[hidden] { display: none; }
+.update-check .note { margin: 0; }
 input[type=checkbox] { padding: 0; }
 input[type=color] { padding: 0; width: 34px; height: 24px; cursor: pointer; }
 main { display: grid; grid-template-columns: 400px 1fr; height: calc(100% - 45px); }

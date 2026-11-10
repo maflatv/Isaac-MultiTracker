@@ -139,7 +139,8 @@ class UserError extends Error {
 }
 
 // Las rutas llegan de fuera: así funciona igual por su cuenta, en la aplicación de escritorio o montado en otra aplicación.
-// options: { desktop, version, pickFile(initialDir, text), obsStatus(), onConfig(config) }.
+// options: { desktop, version, pickFile(initialDir, text), obsStatus(), onConfig(config),
+//   update: { status(), action(name) } (solo la versión instalada: buscar, descargar e instalar actualizaciones) }.
 function createTracker({ resDir, gameDir, steamUserdata, dataDir }, options = {}) {
   const CONFIG_FILE = path.join(dataDir, 'config.json');
   const RUNS_FILE = path.join(dataDir, 'cache', 'runs.json');
@@ -335,7 +336,7 @@ function createTracker({ resDir, gameDir, steamUserdata, dataDir }, options = {}
     const lang = languageOf(config);
     const save = readProgress(config, lang);
     return {
-      lang, desktop: !!options.desktop, version: options.version || null, obs: options.obsStatus ? options.obsStatus() : null,
+      lang, desktop: !!options.desktop, version: options.version || null, update: options.update ? options.update.status() : null, obs: options.obsStatus ? options.obsStatus() : null,
       config, run: runView(lang), progress: save.progress,
       // Segundos jugados en el archivo elegido desde que se registra; null si no es un guardado conocido.
       playtime: timeIdOf(save.id, save.file) ? secondsOf(timeIdOf(save.id, save.file)) : null,
@@ -501,6 +502,10 @@ function createTracker({ resDir, gameDir, steamUserdata, dataDir }, options = {}
       }
     }
     if (method === 'GET' && pathname === '/background') return background();
+    if (method === 'POST' && pathname === '/api/update' && options.update) {
+      const body = await readJsonBody();
+      return json(200, options.update.action(body && ['check', 'download', 'install'].includes(body.action) ? body.action : null));
+    }
     if (method === 'POST' && pathname === '/api/pick-save') {
       return json(200, { path: await choosePath(steamUserdata, { title: T('picker.title'), filter: T('picker.filter'), all: T('picker.all') }) });
     }

@@ -10,7 +10,7 @@ Tracker para The Binding of Isaac: Repentance+ que reúne en una sola vista los 
 
 Solo lee archivos del juego: no modifica tus partidas ni necesita mods.
 
-*An item and Dead God progress tracker for Repentance+. A single portable Windows executable: no installation and no local server. Available in English, Spanish, French, Portuguese and Russian (English by default). Open `MultiTracker.exe` and capture its window in OBS.*
+*An item and Dead God progress tracker for Repentance+. Install it and it updates itself, or use the single portable executable; no local server. Available in English, Spanish, French, Portuguese and Russian (English by default). Run `MultiTracker-Setup-<version>.exe` (or the portable `MultiTracker.exe`) and capture its window in OBS.*
 
 ## Requisitos
 
@@ -19,9 +19,14 @@ Solo lee archivos del juego: no modifica tus partidas ni necesita mods.
 
 ## Instalación
 
-1. Descarga `MultiTracker.exe` de la [última versión](https://github.com/maflatv/Isaac-MultiTracker/releases/latest) y ponlo en su propia carpeta. Tus ajustes se guardarán ahí. Hay también un `.zip` con el mismo `.exe` y las licencias.
-2. Abre `MultiTracker.exe`. Es portable: no se instala ni abre ningún servidor.
-3. Elige tu guardado y tu idioma en el panel.
+En la [última versión](https://github.com/maflatv/Isaac-MultiTracker/releases/latest) hay dos formas de usarlo:
+
+- **Instalador (recomendado):** `MultiTracker-Setup-<versión>.exe`. Se instala solo para tu usuario, sin permisos de administrador, con accesos directos en el escritorio y en el menú Inicio. Arranca más rápido que el portable y **se actualiza solo**: al abrirlo busca si hay una versión nueva y, si la hay, te lo avisa en el panel. Solo descarga si lo pides, y únicamente lo que ha cambiado (normalmente un par de MB, no el instalador entero). Lo descargado se instala al pulsar **Reiniciar y actualizar** o al cerrar MultiTracker. También puedes buscar a mano en **Acerca de → Buscar actualizaciones**.
+- **Portable:** `MultiTracker.exe`, un solo archivo que no se instala. Ponlo en su propia carpeta: tus ajustes se guardarán ahí. No se actualiza solo; para cambiar de versión, descarga el nuevo y sustituye el `.exe`. Hay también un `.zip` con el mismo `.exe` y las licencias.
+
+Después, elige tu guardado y tu idioma en el panel.
+
+**Del portable al instalador:** la primera vez que abres la versión instalada te pregunta si quieres traer tus ajustes. Elige la carpeta donde tenías `MultiTracker.exe` y se copian tu configuración, perfiles, temas, tiempo de juego e imagen de fondo. El portable no se toca.
 
 MultiTracker trae incluidos los iconos de objetos y trinkets, los nombres y sus traducciones (unos 5 MB, en `data/resources/`), así que se abre al momento y no necesita extraer nada del juego. Esos archivos son del juego y pertenecen a Edmund McMillen y Nicalis: no forman parte de la licencia MIT de MultiTracker.
 
@@ -50,7 +55,8 @@ Requiere [Node.js](https://nodejs.org) 24. Las herramientas de compilación (Ele
 - **Sin Electron:** `iniciar.bat` sirve el panel en http://localhost:7374 con Node, y `ventana.bat` abre el tracker en una ventana de Microsoft Edge.
 - **Pruebas:** `node --test "test/*.test.js"` comprueba el lector del log (recoger, quitar, rerolls, Genesis, Alma de Esaú, Strawman, Tainted Lazarus, maldición del ciego, reinicio del log y partidas continuadas) y el del guardado. No necesitan nada instalado aparte de Node.
 - **Actualizar los recursos del juego:** `node build/update-resources.js` vuelve a generar `data/resources/` desde el juego instalado (tarda 2-3 minutos y usa 1,2 GB temporales). Hace falta cuando una actualización del juego añade objetos, trinkets o logros.
-- **Generar el ejecutable:** `node build/build-exe.js 1.7.0` crea `MultiTracker.exe` y el `.zip` en `dist/`. Solo incluye archivos que Git publicaría: lo ignorado nunca llega al `.exe`.
+- **Generar una versión:** `node build/build-exe.js 1.9.0` crea en `dist/` los cinco archivos de una release: `MultiTracker-Setup-1.9.0.exe` (instalador), `MultiTracker-Setup-1.9.0.exe.blockmap` (para descargar solo lo que cambia), `latest.yml` (lo que lee la versión instalada para saber cuál es la última), `MultiTracker.exe` (portable) y el `.zip`. Solo incluye archivos que Git publicaría: lo ignorado nunca llega al programa.
+- **Publicar una versión:** sube el commit y la etiqueta (`git push origin main v1.9.0`) y compila con la variable `GH_TOKEN`: crea la release `v1.9.0` en GitHub **como borrador** con los cinco archivos. Revisa el texto y pulsa **Publish release**; desde ese momento, las versiones instaladas la ven. `GH_TOKEN` es un token de GitHub de grano fino con acceso a este repositorio y permiso **Contents: Read and write** (GitHub → Settings → Developer settings → Personal access tokens). Sin `GH_TOKEN` no se publica nada y los cinco archivos se suben a mano; si falta `latest.yml`, las versiones instaladas no se enteran de la nueva.
 
 ## Qué muestra
 
@@ -80,7 +86,7 @@ MultiTracker busca sola las carpetas, incluidas otras bibliotecas de Steam. Si n
 | `gameDir` | La que contiene `log.txt`, en `Documents/My Games/Binding of Isaac Repentance+` |
 | `steamUserdata` | `userdata` de Steam, donde están los guardados |
 
-El archivo debe estar junto a `MultiTracker.exe`. Tus ajustes se guardan en `userdata/`, también junto a él: `config.json` (guardado, idioma, opciones, apariencia, perfiles y temas propios), `windows.json` (posición de las ventanas), `playtime.json` (tiempo de juego de cada archivo) y, si eliges una, `background.*` (la imagen de fondo). Si mueves `MultiTracker.exe`, lleva `userdata/` con él: el tiempo registrado no se puede volver a calcular.
+El archivo debe estar en la carpeta de tus ajustes: junto a `MultiTracker.exe` en el portable, o en `%APPDATA%\MultiTracker` en la versión instalada. Tus ajustes se guardan en `userdata/` dentro de esa carpeta (desinstalar no los borra): `config.json` (guardado, idioma, opciones, apariencia, perfiles y temas propios), `windows.json` (posición de las ventanas), `playtime.json` (tiempo de juego de cada archivo) y, si eliges una, `background.*` (la imagen de fondo). Si mueves el `MultiTracker.exe` portable, lleva `userdata/` con él: el tiempo registrado no se puede volver a calcular.
 
 ## Fuente Upheaval (opcional)
 

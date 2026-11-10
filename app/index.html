@@ -17,6 +17,11 @@
     <button id="openWindow" class="primary" data-i18n="panel.openWindow"></button>
   </div>
 </header>
+<div id="updateBar" class="update-bar" hidden>
+  <span id="updateText"></span>
+  <button type="button" id="updateButton" class="primary"></button>
+  <button type="button" id="updateLater" data-i18n="update.later"></button>
+</div>
 <main>
   <form id="form">
     <section>
@@ -256,6 +261,8 @@
       <p data-i18n="about.lead"></p>
       <p class="about-author"><strong>Mafla</strong> · <span data-i18n="about.creator"></span></p>
       <p class="note" id="appVersion"></p>
+      <p class="update-check" id="updateCheck" hidden><button type="button" id="checkUpdates" data-i18n="update.check"></button> <span class="note" id="updateNote"></span></p>
+      <p class="note" id="updatePortable" data-i18n="update.portable" hidden></p>
       <h3 data-i18n="about.social"></h3>
       <div class="social-links" id="socialLinks"></div>
       <h3><span aria-hidden="true" class="heart">♥</span> <span data-i18n="about.support"></span></h3>

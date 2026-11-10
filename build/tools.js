@@ -1,4 +1,5 @@
-// Herramientas de compilación: se instalan en .build/, fuera del repositorio. MultiTracker no tiene dependencias propias.
+// Herramientas de compilación: se instalan en .build/, fuera del repositorio. El código de MultiTracker no tiene
+// dependencias; solo la versión instalada lleva electron-updater dentro, para actualizarse sola.
 const fs = require('fs');
 const path = require('path');
 const { execFileSync } = require('child_process');
@@ -8,6 +9,9 @@ const WORK = path.join(ROOT, '.build');
 // Versiones fijas: una compilación debe dar siempre el mismo resultado.
 const ELECTRON = '44.9.3';
 const ELECTRON_BUILDER = '26.18.0';
+const ELECTRON_UPDATER = '6.8.12';
+// electron-updater y sus dependencias, aparte de las herramientas: esta carpeta node_modules va dentro del programa.
+const RUNTIME = path.join(WORK, 'runtime');
 
 const run = (cmd, args, opts = {}) => execFileSync(cmd, args, { stdio: 'inherit', cwd: WORK, ...opts });
 
@@ -28,4 +32,14 @@ function installTools() {
   }
 }
 
-module.exports = { ROOT, WORK, ELECTRON, ELECTRON_BUILDER, installTools, run };
+function installRuntime() {
+  const pkg = path.join(RUNTIME, 'node_modules', 'electron-updater', 'package.json');
+  try { if (JSON.parse(fs.readFileSync(pkg, 'utf8')).version === ELECTRON_UPDATER) return RUNTIME; } catch { /* hay que instalarlo */ }
+  fs.rmSync(RUNTIME, { recursive: true, force: true });
+  fs.mkdirSync(RUNTIME, { recursive: true });
+  fs.writeFileSync(path.join(RUNTIME, 'package.json'), JSON.stringify({ name: 'multitracker-runtime', private: true }, null, 2));
+  run('npm', ['install', '--omit=dev', '--no-audit', '--no-fund', '--save-exact', `electron-updater@${ELECTRON_UPDATER}`], { shell: true, cwd: RUNTIME });
+  return RUNTIME;
+}
+
+module.exports = { ROOT, WORK, ELECTRON, ELECTRON_BUILDER, ELECTRON_UPDATER, installTools, installRuntime, run };

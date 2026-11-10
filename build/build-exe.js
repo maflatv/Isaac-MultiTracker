@@ -1,19 +1,28 @@
-// Genera dist/MultiTracker.exe (portable: un solo archivo, sin instalar nada) y el .zip para publicar.
-// Uso: node build/build-exe.js 1.7.0
-// Solo incluye lo que Git publicaría: lo ignorado (userdata/, la fuente Upheaval...) nunca llega al .exe.
+// Genera en dist/ las dos formas de MultiTracker para Windows:
+// - MultiTracker-Setup-<versión>.exe: instalador. La versión instalada se actualiza sola desde las releases de GitHub
+//   y descarga solo lo que cambia gracias al .blockmap; latest.yml le dice cuál es la última versión.
+// - MultiTracker.exe: portable, un solo archivo sin instalar nada. También va en el .zip, con las licencias a la vista.
+// Uso: node build/build-exe.js 1.9.0
+// Con la variable GH_TOKEN (un token de GitHub con permiso para escribir en el repositorio), además crea la release
+// v<versión> como borrador y sube los cinco archivos. Antes hay que subir el commit y la etiqueta v<versión>.
+// Solo incluye lo que Git publicaría: lo ignorado (userdata/, la fuente Upheaval...) nunca llega al programa.
 const fs = require('fs');
 const path = require('path');
 const { execFileSync } = require('child_process');
-const { ROOT, WORK, ELECTRON, installTools, run } = require('./tools.js');
+const { ROOT, WORK, ELECTRON, ELECTRON_UPDATER, installTools, installRuntime, run } = require('./tools.js');
 
 const VERSION = process.argv[2];
-if (!/^\d+\.\d+\.\d+$/.test(VERSION || '')) throw new Error('Indica la versión: node build/build-exe.js 1.7.0');
+if (!/^\d+\.\d+\.\d+$/.test(VERSION || '')) throw new Error('Indica la versión: node build/build-exe.js 1.9.0');
+const TOKEN = process.env.GH_TOKEN || '';
+const REPO = { owner: 'maflatv', repo: 'Isaac-MultiTracker' };
 
 const DIST = path.join(ROOT, 'dist');
 const STAGE = path.join(WORK, 'stage');
 const OUT = path.join(WORK, 'out');
-// Lo que necesita la aplicación en marcha. El resto del repositorio (README, scripts .bat...) no va dentro.
+// Lo que necesita la aplicación en marcha. El resto del repositorio (README, pruebas, scripts .bat...) no va dentro.
 const APP_FILES = ['app', 'data', 'lib', 'desktop', 'tracker.js', 'paths.js', 'server.js', 'build/icon.ico', 'LICENSE'];
+const SETUP = `MultiTracker-Setup-${VERSION}.exe`;
+const ZIP = `MultiTracker-${VERSION}-windows-x64.zip`;
 
 function stage() {
   fs.rmSync(STAGE, { recursive: true, force: true });
@@ -24,10 +33,13 @@ function stage() {
     fs.mkdirSync(path.dirname(to), { recursive: true });
     fs.copyFileSync(path.join(ROOT, rel), to);
   }
+  // electron-updater, para que la versión instalada se actualice. El portable lo lleva también, pero no lo usa.
+  fs.cpSync(path.join(installRuntime(), 'node_modules'), path.join(STAGE, 'node_modules'), { recursive: true });
   fs.writeFileSync(path.join(STAGE, 'package.json'), JSON.stringify({
     name: 'multitracker', productName: 'MultiTracker', version: VERSION,
     description: 'Item and Dead God progress tracker for The Binding of Isaac: Repentance+',
     author: 'Mafla', license: 'MIT', main: 'desktop/main.js',
+    dependencies: { 'electron-updater': ELECTRON_UPDATER },
   }, null, 2));
   return tracked.length;
 }
@@ -43,40 +55,68 @@ function builderConfig() {
     files: ['**/*'],
     asar: true,
     npmRebuild: false,
-    win: { target: [{ target: 'portable', arch: ['x64'] }], icon: path.join(STAGE, 'build', 'icon.ico') },
+    win: { target: [{ target: 'nsis', arch: ['x64'] }, { target: 'portable', arch: ['x64'] }], icon: path.join(STAGE, 'build', 'icon.ico') },
+    // Instalador para el usuario, sin permisos de administrador. Se puede elegir la carpeta. Desinstalar no borra los
+    // ajustes (%APPDATA%\MultiTracker). En el idioma de Windows, entre los cinco de MultiTracker.
+    nsis: {
+      oneClick: false, perMachine: false, allowToChangeInstallationDirectory: true,
+      createDesktopShortcut: true, createStartMenuShortcut: true, shortcutName: 'MultiTracker',
+      deleteAppDataOnUninstall: false, artifactName: SETUP,
+      multiLanguageInstaller: true, installerLanguages: ['en_US', 'es_ES', 'fr_FR', 'pt_BR', 'ru_RU'],
+    },
     portable: { artifactName: 'MultiTracker.exe' },
+    // De aquí lee la versión instalada dónde buscar actualizaciones (app-update.yml). Con GH_TOKEN, también se publica.
+    publish: [{ provider: 'github', owner: REPO.owner, repo: REPO.repo, releaseType: 'draft' }],
   };
 }
 
-function main() {
-  fs.rmSync(DIST, { recursive: true, force: true });
-  fs.rmSync(OUT, { recursive: true, force: true });
+// El .zip con el portable y las licencias no lo sube electron-builder: se añade a la misma release en borrador.
+async function uploadZip(file) {
+  const api = `https://api.github.com/repos/${REPO.owner}/${REPO.repo}`;
+  const headers = { Authorization: `Bearer ${TOKEN}`, Accept: 'application/vnd.github+json', 'User-Agent': 'multitracker-build' };
+  const releases = await (await fetch(`${api}/releases?per_page=30`, { headers })).json();
+  const release = Array.isArray(releases) && releases.find(r => r.tag_name === `v${VERSION}`);
+  if (!release) throw new Error(`No se encuentra la release v${VERSION} en GitHub`);
+  const old = release.assets.find(a => a.name === ZIP);
+  if (old) await fetch(`${api}/releases/assets/${old.id}`, { method: 'DELETE', headers });
+  const url = release.upload_url.replace(/\{.*\}$/, '') + '?name=' + encodeURIComponent(ZIP);
+  const r = await fetch(url, { method: 'POST', headers: { ...headers, 'Content-Type': 'application/zip' }, body: fs.readFileSync(file) });
+  if (!r.ok) throw new Error(`No se pudo subir ${ZIP}: HTTP ${r.status}`);
+  return release.html_url;
+}
+
+async function main() {
+  // Se vacía dist/ salvo userdata/: los ajustes de quien prueba el portable desde ahí.
   fs.mkdirSync(DIST, { recursive: true });
+  for (const f of fs.readdirSync(DIST)) if (f !== 'userdata') fs.rmSync(path.join(DIST, f), { recursive: true, force: true });
+  fs.rmSync(OUT, { recursive: true, force: true });
   installTools();
   console.log(`${stage()} archivos incluidos`);
 
   const configFile = path.join(WORK, 'electron-builder.json');
   fs.writeFileSync(configFile, JSON.stringify(builderConfig(), null, 2));
-  run(process.execPath, [path.join(WORK, 'node_modules', 'electron-builder', 'cli.js'), '--win', '--projectDir', STAGE, '--config', configFile]);
+  run(process.execPath, [path.join(WORK, 'node_modules', 'electron-builder', 'cli.js'), '--win', '--projectDir', STAGE, '--config', configFile, '--publish', TOKEN ? 'always' : 'never']);
 
-  const exe = path.join(DIST, 'MultiTracker.exe');
-  fs.copyFileSync(path.join(OUT, 'MultiTracker.exe'), exe);
+  for (const f of ['MultiTracker.exe', SETUP, `${SETUP}.blockmap`, 'latest.yml']) fs.copyFileSync(path.join(OUT, f), path.join(DIST, f));
 
   // El .exe ya lleva dentro las licencias de Electron y Chromium; el .zip las incluye también a la vista.
   const pack = path.join(WORK, 'pack');
   fs.rmSync(pack, { recursive: true, force: true });
   fs.mkdirSync(pack);
-  fs.copyFileSync(exe, path.join(pack, 'MultiTracker.exe'));
+  fs.copyFileSync(path.join(DIST, 'MultiTracker.exe'), path.join(pack, 'MultiTracker.exe'));
   fs.copyFileSync(path.join(__dirname, 'LEEME.txt'), path.join(pack, 'LEEME.txt'));
   fs.copyFileSync(path.join(ROOT, 'LICENSE'), path.join(pack, 'LICENSE.txt'));
   fs.copyFileSync(path.join(ROOT, 'data', 'LICENSE-RebirthItemTracker.txt'), path.join(pack, 'LICENSE-RebirthItemTracker.txt'));
   const unpacked = path.join(OUT, 'win-unpacked');
   fs.copyFileSync(path.join(unpacked, 'LICENSE.electron.txt'), path.join(pack, 'LICENSE-Electron.txt'));
   fs.copyFileSync(path.join(unpacked, 'LICENSES.chromium.html'), path.join(pack, 'LICENSES-Chromium.html'));
-
-  const zip = path.join(DIST, `MultiTracker-${VERSION}-windows-x64.zip`);
+  const zip = path.join(DIST, ZIP);
   execFileSync('powershell.exe', ['-NoProfile', '-Command', 'Compress-Archive -Path (Join-Path $env:PACK "*") -DestinationPath $env:ZIP -Force'], { stdio: 'inherit', env: { ...process.env, PACK: pack, ZIP: zip } });
-  console.log(`Listo: ${exe}\n       ${zip}`);
+
+  console.log(`Listo en ${DIST}:`);
+  for (const f of fs.readdirSync(DIST).filter(f => fs.statSync(path.join(DIST, f)).isFile())) console.log(`  ${f}`);
+  if (TOKEN) console.log(`Release en borrador con los archivos: ${await uploadZip(zip)}\nRevísala y publícala desde GitHub.`);
+  else console.log('Sin GH_TOKEN no se ha publicado nada: sube a mano los cinco archivos a la release v' + VERSION + '.');
 }
 
-main();
+main().catch(e => { console.error(e.message || e); process.exit(1); });

@@ -8,6 +8,10 @@ Hace falta The Binding of Isaac: Repentance+ en Steam, en Windows de 64 bits.
 
 1. Abre MultiTracker.exe. Es portable: no se instala ni usa un servidor.
    (Open MultiTracker.exe. It is portable: no installation, no server.)
+   El portable no se actualiza solo. Si prefieres que lo haga, usa el
+   instalador MultiTracker-Setup-<versión>.exe de la misma página.
+   (The portable version does not update itself. If you want it to, use the
+   MultiTracker-Setup-<version>.exe installer from the same page.)
 2. Elige tu guardado y tu idioma en el panel. El idioma por defecto es el inglés.
    (Choose your save and language in the panel. English is the default.)
 

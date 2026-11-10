@@ -638,6 +638,60 @@ async function refreshStatus() {
     $('saveStatus').textContent = tr('save.reading', { file: src.file }) + time + (s.progress && s.progress.complete ? tr('save.complete') : '');
   }
   syncObs(s.obs);
+  renderUpdate(s.update);
+}
+
+// ---------- Actualizaciones (solo la versión instalada) ----------
+// Nunca se descarga nada sin que el usuario lo pida: el aviso ofrece descargar y, al terminar, reiniciar.
+// «Ahora no» oculta el aviso de esa versión hasta el siguiente arranque.
+const UPDATE_POLL_MS = 700;
+const UPDATE_MESSAGES = {
+  available: ['update.available', 'update.download', 'download'],
+  downloading: ['update.downloading', null, null],
+  ready: ['update.ready', 'update.restart', 'install'],
+  error: ['update.error', null, null],
+};
+let updateLater = null;
+let updatePolling = false;
+// Versión del aviso que se ve ahora, para que «Ahora no» oculte esa y no la siguiente.
+let shownUpdate = null;
+
+function renderUpdate(u) {
+  const enabled = !!(u && u.enabled);
+  shownUpdate = enabled ? u.version : null;
+  $('updateCheck').hidden = !enabled;
+  $('updatePortable').hidden = !(desktop && u && !u.installed);
+  const msg = enabled && UPDATE_MESSAGES[u.state];
+  $('updateBar').hidden = !msg || (u.state === 'available' && updateLater === u.version);
+  if (msg) {
+    $('updateBar').classList.toggle('error', u.state === 'error');
+    $('updateText').textContent = tr(msg[0], { version: u.version, percent: u.percent, error: u.error });
+    $('updateButton').hidden = !msg[1];
+    if (msg[1]) { $('updateButton').textContent = tr(msg[1]); $('updateButton').dataset.action = msg[2]; }
+    $('updateLater').hidden = u.state !== 'available';
+  }
+  $('updateNote').textContent = enabled ? ({ checking: tr('update.checking'), latest: tr('update.latest') }[u.state] || '') : '';
+  $('checkUpdates').disabled = !enabled || ['checking', 'downloading', 'ready'].includes(u.state);
+  // Mientras busca o descarga, se pregunta más a menudo para que el porcentaje avance.
+  if (enabled && ['checking', 'downloading'].includes(u.state) && !updatePolling) {
+    updatePolling = true;
+    setTimeout(async () => {
+      updatePolling = false;
+      try { renderUpdate((await fetch(api('api/state')).then(r => r.json())).update); } catch { /* se reintenta en el próximo refresco */ }
+    }, UPDATE_POLL_MS);
+  }
+}
+
+async function updateAction(action) {
+  const r = await fetch('api/update', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action }) });
+  if (r.ok) renderUpdate(await r.json());
+}
+
+function initUpdates(u) {
+  $('updateButton').addEventListener('click', () => updateAction($('updateButton').dataset.action));
+  $('checkUpdates').addEventListener('click', () => updateAction('check'));
+  $('updateLater').addEventListener('click', () => { updateLater = shownUpdate; $('updateBar').hidden = true; });
+  renderUpdate(u);
 }
 
 async function init() {
@@ -650,6 +704,7 @@ async function init() {
   I18N.apply(lang, document);
   // Para saber qué versión tiene abierta quien informa de un fallo. «dev» al ejecutar desde el código.
   $('appVersion').textContent = tr('about.version', { version: state.version || 'dev' });
+  initUpdates(state.update);
 
   syncPreviewSize();
   initLanguage(choices.languages);

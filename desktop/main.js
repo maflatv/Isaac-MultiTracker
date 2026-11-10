@@ -1,9 +1,10 @@
 // MultiTracker como aplicación de escritorio: el panel y la vista se abren en ventanas propias.
 // No hace falta servidor: las páginas piden los datos por el protocolo multitracker://, que se atiende en este mismo proceso.
 // Solo si el usuario lo activa se abre además http://localhost para la fuente de navegador de OBS.
+const fs = require('fs');
 const path = require('path');
 const { app, BrowserWindow, Menu, dialog, protocol, screen, shell } = require('electron');
-const { BASE_DIR, APP_ROOT } = require('../lib/runtime.js');
+const { BASE_DIR, APP_ROOT, IS_INSTALLED } = require('../lib/runtime.js');
 const { readJson, writeFile, cacheControl, send } = require('../lib/http.js');
 const { resolvePaths } = require('../paths.js');
 const { listen, DEFAULT_PORT } = require('../server.js');
@@ -22,7 +23,7 @@ const PANEL_SIZE = { width: 1280, height: 860 };
 const DARK = '#1d1714';
 
 protocol.registerSchemesAsPrivileged([{ scheme: SCHEME, privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true } }]);
-// Portable de verdad: los datos de Chromium también se guardan junto al .exe, no en AppData.
+// Los datos de Chromium van con los demás ajustes: en el portable, junto al .exe y no en AppData.
 app.setPath('userData', path.join(DATA_DIR, 'chromium'));
 
 let tracker = null;
@@ -172,13 +173,91 @@ async function serve(request) {
   return new Response(r.body, { status: r.status, headers: { 'Content-Type': r.type, 'Cache-Control': cacheControl(r.cache) } });
 }
 
+// ---------- Actualizaciones (solo la versión instalada) ----------
+// Busca al arrancar y cada UPDATE_CHECK_MS. Nunca descarga sin que el usuario lo pida en el panel; lo descargado
+// se instala al reiniciar desde el aviso o, si no, al cerrar MultiTracker. Descarga solo lo que cambia (blockmap).
+const UPDATE_CHECK_MS = 6 * 60 * 60 * 1000;
+let updater = null;
+// state: idle, checking, latest, available, downloading, ready, error. manual: la búsqueda la pidió el usuario.
+const update = { state: 'idle', version: null, percent: 0, error: null, manual: false };
+
+function setupUpdater() {
+  if (!IS_INSTALLED) return;
+  try { ({ autoUpdater: updater } = require('electron-updater')); } catch { return; }
+  updater.autoDownload = false;
+  updater.autoInstallOnAppQuit = true;
+  updater.on('update-available', i => Object.assign(update, { state: 'available', version: i.version, error: null }));
+  updater.on('update-not-available', () => Object.assign(update, { state: 'latest', error: null }));
+  updater.on('download-progress', p => Object.assign(update, { state: 'downloading', percent: Math.floor(p.percent) }));
+  updater.on('update-downloaded', i => Object.assign(update, { state: 'ready', version: i.version, percent: 100 }));
+  // Sin conexión, por ejemplo. Una búsqueda automática que falla no molesta: solo se informa si la pidió el usuario
+  // o si fallaba una descarga.
+  updater.on('error', e => {
+    const shown = update.manual || update.state === 'downloading';
+    Object.assign(update, { state: shown ? 'error' : 'idle', error: String((e && e.message) || e).split(/\r?\n/)[0] });
+  });
+  checkUpdates(false);
+  setInterval(() => { if (['idle', 'latest', 'error'].includes(update.state)) checkUpdates(false); }, UPDATE_CHECK_MS).unref();
+}
+
+function checkUpdates(manual) {
+  Object.assign(update, { state: 'checking', manual, error: null });
+  updater.checkForUpdates().catch(() => { /* lo informa el evento error */ });
+}
+
+// Lo que pide el panel: check, download o install. Devuelve el estado.
+function updateAction(action) {
+  if (!updater) return updateStatus();
+  if (action === 'check' && !['checking', 'downloading', 'ready'].includes(update.state)) checkUpdates(true);
+  else if (action === 'download' && update.state === 'available') {
+    Object.assign(update, { state: 'downloading', percent: 0 });
+    updater.downloadUpdate().catch(() => { /* lo informa el evento error */ });
+  } else if (action === 'install' && update.state === 'ready') {
+    // En silencio (sin el asistente del instalador) y volviendo a abrir MultiTracker al terminar.
+    setImmediate(() => updater.quitAndInstall(true, true));
+  }
+  return updateStatus();
+}
+const updateStatus = () => ({ ...update, enabled: !!updater, installed: IS_INSTALLED });
+
+// ---------- Primer arranque de la versión instalada ----------
+// Sus ajustes van en %APPDATA%\MultiTracker. Quien venía del portable puede traer los suyos (configuración, perfiles,
+// temas, tiempo de juego, imagen de fondo) eligiendo la carpeta del MultiTracker.exe portable.
+const PORTABLE_DATA = ['config.json', 'playtime.json', 'windows.json', 'cache', 'background.png', 'background.jpg', 'background.gif', 'background.webp'];
+function firstRun() {
+  const config = path.join(DATA_DIR, 'config.json');
+  if (!IS_INSTALLED || fs.existsSync(config)) return;
+  const lang = resolve(app.getLocale());
+  const answer = dialog.showMessageBoxSync({
+    type: 'question', title: 'MultiTracker', message: t(lang, 'install.importMessage'), detail: t(lang, 'install.importDetail'),
+    buttons: [t(lang, 'install.importButton'), t(lang, 'install.freshButton')], defaultId: 0, cancelId: 1, noLink: true,
+  });
+  while (answer === 0) {
+    const picked = dialog.showOpenDialogSync({ title: t(lang, 'install.pickFolder'), properties: ['openDirectory'] });
+    if (!picked) break;
+    // Vale la carpeta del .exe portable o su carpeta userdata.
+    const from = [path.join(picked[0], 'userdata'), picked[0]].find(d => fs.existsSync(path.join(d, 'config.json')));
+    if (from) {
+      fs.mkdirSync(DATA_DIR, { recursive: true });
+      for (const f of PORTABLE_DATA) if (fs.existsSync(path.join(from, f))) fs.cpSync(path.join(from, f), path.join(DATA_DIR, f), { recursive: true });
+      return;
+    }
+    dialog.showMessageBoxSync({ type: 'warning', title: 'MultiTracker', message: t(lang, 'install.notFound'), noLink: true });
+  }
+  // Sin importar: un archivo vacío (todo por defecto) para no volver a preguntar.
+  writeFile(config, '{}');
+}
+
 function start() {
+  firstRun();
+  setupUpdater();
   const paths = resolvePaths(BASE_DIR);
   const { createTracker } = require('../tracker.js');
   tracker = createTracker({ ...paths, dataDir: DATA_DIR }, {
     desktop: true,
     // La del .exe (package.json de build/build-exe.js); desde el código no hay versión.
     version: app.isPackaged ? app.getVersion() : null,
+    update: { status: updateStatus, action: updateAction },
     pickFile: openFileDialog,
     onConfig: config => { syncObs(config); syncViewSize(); loadViewProfile(); },
     obsStatus: () => ({ running: obs.running, error: obs.error, port: OBS_PORT, url: `http://localhost:${OBS_PORT}/overlay.html` }),
