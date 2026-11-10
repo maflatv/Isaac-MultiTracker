@@ -7,7 +7,6 @@ const { BASE_DIR, APP_ROOT } = require('../lib/runtime.js');
 const { readJson, writeFile, cacheControl } = require('../lib/http.js');
 const { resolvePaths } = require('../paths.js');
 const { listen, DEFAULT_PORT } = require('../server.js');
-const { extractResources, cancelExtraction } = require('../lib/resources.js');
 const { t, resolve } = require('../app/i18n.js');
 
 const SCHEME = 'multitracker';
@@ -166,56 +165,8 @@ async function serve(request) {
   return new Response(r.body, { status: r.status, headers: { 'Content-Type': r.type, 'Cache-Control': cacheControl(r.cache) } });
 }
 
-// Ventana pequeña con una barra mientras se extraen los recursos del juego. Cerrarla cancela la extracción.
-function progressWindow(lang) {
-  const esc = s => s.replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c]);
-  const html = `<!doctype html><meta charset="utf-8"><style>
-    body { margin: 0; padding: 22px 26px; background: ${DARK}; color: #eadfd6; font: 14px/1.45 "Segoe UI", system-ui, sans-serif; user-select: none; }
-    h1 { font-size: 16px; margin: 0 0 6px; } p { margin: 0 0 16px; color: #b9aca2; }
-    .bar { height: 10px; border-radius: 5px; background: #3a2f29; overflow: hidden; }
-    .fill { height: 100%; width: 0; background: #d9a441; transition: width .3s; }
-    .pct { margin-top: 8px; font-size: 12px; color: #b9aca2; text-align: right; font-variant-numeric: tabular-nums; }
-  </style><h1>${esc(t(lang, 'start.extracting'))}</h1><p>${esc(t(lang, 'start.extractingDetail'))}</p>
-  <div class="bar"><div class="fill" id="f"></div></div><div class="pct" id="p">0%</div>
-  <script>window.set = v => { document.getElementById('f').style.width = v + '%'; document.getElementById('p').textContent = v + '%'; };</script>`;
-  const win = createWindow({ width: 480, height: 190, useContentSize: true, resizable: false, maximizable: false, fullscreenable: false }, 'MultiTracker');
-  win.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
-  let shown = -1;
-  return {
-    win,
-    set(p) {
-      const pct = Math.floor(p * 100);
-      if (pct === shown || win.isDestroyed()) return;
-      shown = pct;
-      win.webContents.executeJavaScript(`window.set && window.set(${pct})`).catch(() => {});
-    },
-  };
-}
-
-// Primera vez (o si se borraron): se extraen los recursos de la copia del juego antes de abrir el panel.
-async function ensureResources(paths) {
-  if (paths.resDir) return paths;
-  const lang = language();
-  const progress = progressWindow(lang);
-  let cancelled = false, finished = false;
-  progress.win.on('close', () => { if (!finished) { cancelled = true; cancelExtraction(); } });
-  try {
-    const resDir = await extractResources(paths.isaacDir, paths.ownResDir, p => progress.set(p));
-    return { ...paths, resDir };
-  } catch (e) {
-    if (cancelled || e.key === 'cancelled') return null;
-    if (!e.key) throw e;
-    dialog.showMessageBoxSync({ type: 'error', title: 'MultiTracker', message: t(lang, e.key, e.vars), detail: t(lang, 'start.manualSteps') });
-    return null;
-  } finally {
-    finished = true;
-    if (!progress.win.isDestroyed()) progress.win.destroy();
-  }
-}
-
-async function start() {
-  const paths = await ensureResources(resolvePaths(BASE_DIR));
-  if (!paths) { app.quit(); return; }
+function start() {
+  const paths = resolvePaths(BASE_DIR);
   const { createTracker } = require('../tracker.js');
   tracker = createTracker({ ...paths, dataDir: DATA_DIR }, {
     desktop: true,
@@ -237,7 +188,7 @@ if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
   app.on('second-instance', () => { if (tracker) openPanel(); });
-  app.on('window-all-closed', () => { if (tracker) app.quit(); });
+  app.on('window-all-closed', () => app.quit());
   app.whenReady().then(start).catch(e => {
     console.error(e);
     dialog.showErrorBox('MultiTracker', String(e.stack || e));

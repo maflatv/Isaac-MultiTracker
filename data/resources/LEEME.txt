@@ -1,0 +1,10 @@
+Recursos de The Binding of Isaac: Repentance+ (iconos de objetos y trinkets, cabezas de
+personajes, items.xml, items_metadata.xml, achievements.xml y stringtable.sta).
+Son propiedad de Edmund McMillen y Nicalis, Inc. y se incluyen con permiso para un uso
+sin ánimo de lucro. No forman parte de la licencia MIT de MultiTracker.
+
+Se generan desde el juego instalado con: node build/update-resources.js
+
+Game resources from The Binding of Isaac: Repentance+, property of Edmund McMillen and
+Nicalis, Inc., included with permission for non-commercial use. Not covered by
+MultiTracker's MIT license.

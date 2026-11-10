@@ -307,7 +307,8 @@ function createTracker({ resDir, gameDir, steamUserdata, dataDir }, options = {}
     const seen = {};
     for (const i of r.items) {
       const it = info[i.id];
-      if (it && !i.soul) for (const k of Object.keys(TRANSFORMS)) if (it[k]) (seen[k] = seen[k] || new Set()).add(i.id);
+      // Lo de Esau (Alma de Jacob y Esaú) y del Keeper de Strawman cuenta para ellos, no para el personaje.
+      if (it && !i.soul && !i.helper) for (const k of Object.keys(TRANSFORMS)) if (it[k]) (seen[k] = seen[k] || new Set()).add(i.id);
     }
     const floor = r.floors[r.floors.length - 1];
     return {
@@ -495,7 +496,7 @@ function createTracker({ resDir, gameDir, steamUserdata, dataDir }, options = {}
     }
     let m;
     if (method === 'GET' && (m = /^\/icon\/item\/(\d+)\.png$/.exec(pathname))) return icon(gameData().icons.get(+m[1]));
-    if (method === 'GET' && (m = /^\/icon\/owner\/(\w+)\/(head|hair)\.png$/.exec(pathname)) && Object.hasOwn(OWNER_SPRITES, m[1])) {
+    if (method === 'GET' && (m = /^\/icon\/owner\/(\w+)\/(head|hair)\.png$/.exec(pathname)) && Object.hasOwn(OWNER_SPRITES, m[1]) && OWNER_SPRITES[m[1]][m[2]]) {
       return icon(path.join(COSTUMES, OWNER_SPRITES[m[1]][m[2]]));
     }
     if (method === 'GET' && (m = /^\/icon\/achievement\/(\d+)\.jpg$/.exec(pathname))) {

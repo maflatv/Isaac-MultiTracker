@@ -90,6 +90,7 @@ body.highlighting #view { opacity: 0; }
 .owner-badge.jacob, .owner-badge.lazarus { background: #6cc4ff; }
 .owner-badge.esau { background: #ff8a6c; }
 .owner-badge.lazarus_dead { background: #b3343f; }
+.owner-badge.strawman { background: #d9b45a; }
 /* Con los recursos: la cabeza del personaje, que crece con el icono. Por defecto sola, con un borde oscuro para que se
    distinga sobre el objeto; con «Fondo de color», sobre un círculo de su color.
    Se ve la zona central de 48 px del cuadro de 64 del pelo; la cabeza (32 px) va en el centro de ese cuadro. */
@@ -98,6 +99,7 @@ body.highlighting #view { opacity: 0; }
 .owner-bg .owner-badge.art.jacob, .owner-bg .owner-badge.art.lazarus { background: #6cc4ff; }
 .owner-bg .owner-badge.art.esau { background: #ff8a6c; }
 .owner-bg .owner-badge.art.lazarus_dead { background: #b3343f; }
+.owner-bg .owner-badge.art.strawman { background: #d9b45a; }
 .owner-badge.art i { position: absolute; background-repeat: no-repeat; background-position: 0 0; image-rendering: pixelated; }
 .owner-badge.art .head { left: calc(var(--badge) / 6); top: calc(var(--badge) / 6); width: calc(var(--badge) * 2 / 3); height: calc(var(--badge) * 2 / 3); background-size: 1600% 1600%; }
 .owner-badge.art .hair { left: calc(var(--badge) / -6); top: calc(var(--badge) / -6); width: calc(var(--badge) * 4 / 3); height: calc(var(--badge) * 4 / 3); background-size: 800% 100%; }

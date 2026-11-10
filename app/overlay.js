@@ -17,14 +17,16 @@ const PAGE_MS = 5000;
 const OWNERS = {
   jacob: { key: 'view.jacob', letter: 'J' }, esau: { key: 'view.esau', letter: 'E' },
   lazarus: { key: 'view.lazarus', letter: 'L' }, lazarus_dead: { key: 'view.lazarusDead', letter: 'D' },
+  strawman: { key: 'view.strawman', letter: 'S', parts: ['head'] },
 };
-// owner -> 'loading' | 'ok' | 'fail'. Se comprueba una vez si están las dos hojas; al cargarse se vuelve a dibujar.
+const ownerParts = owner => OWNERS[owner].parts || ['head', 'hair'];
+// owner -> 'loading' | 'ok' | 'fail'. Se comprueba una vez si están todas sus hojas; al cargarse se vuelve a dibujar.
 const ownerArt = {};
 function hasOwnerArt(owner) {
   if (!(owner in ownerArt)) {
     ownerArt[owner] = 'loading';
-    let left = 2;
-    for (const part of ['head', 'hair']) {
+    let left = ownerParts(owner).length;
+    for (const part of ownerParts(owner)) {
       const img = new Image();
       img.onload = () => { if (--left === 0 && ownerArt[owner] === 'loading') { ownerArt[owner] = 'ok'; if (current) render(current); } };
       img.onerror = () => { ownerArt[owner] = 'fail'; };
@@ -36,7 +38,7 @@ function hasOwnerArt(owner) {
 function ownerBadge(owner) {
   if (!hasOwnerArt(owner)) return el('span', 'owner-badge ' + owner, OWNERS[owner].letter);
   const b = el('span', 'owner-badge art ' + owner);
-  for (const part of ['head', 'hair']) {
+  for (const part of ownerParts(owner)) {
     const layer = el('i', part);
     layer.style.backgroundImage = `url(icon/owner/${owner}/${part}.png)`;
     b.append(layer);

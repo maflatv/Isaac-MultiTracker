@@ -10,7 +10,7 @@ Tracker para The Binding of Isaac: Repentance+ que reúne en una sola vista los 
 
 Solo lee archivos del juego: no modifica tus partidas ni necesita mods.
 
-*An item and Dead God progress tracker for Repentance+. A single portable Windows executable: no installation and no local server. Available in English, Spanish, French, Portuguese and Russian (English by default). Open `MultiTracker.exe` (on first launch it extracts the icons and names it needs from your copy of the game) and capture its window in OBS.*
+*An item and Dead God progress tracker for Repentance+. A single portable Windows executable: no installation and no local server. Available in English, Spanish, French, Portuguese and Russian (English by default). Open `MultiTracker.exe` and capture its window in OBS.*
 
 ## Requisitos
 
@@ -23,7 +23,7 @@ Solo lee archivos del juego: no modifica tus partidas ni necesita mods.
 2. Abre `MultiTracker.exe`. Es portable: no se instala ni abre ningún servidor.
 3. Elige tu guardado y tu idioma en el panel.
 
-MultiTracker no incluye ningún archivo del juego. La primera vez que lo abres extrae los iconos, los nombres y sus traducciones de tu copia del juego con el `ResourceExtractor` que trae el propio juego. Tarda unos minutos y muestra su avance. Mientras dura necesita unos 1,5 GB libres en la carpeta temporal de Windows; al acabar guarda solo lo que usa, unos 5 MB, en `userdata/resources/`, y borra el resto. En cada arranque comprueba que esa carpeta siga completa y, si falta algo, vuelve a extraerla. Si ya ejecutaste el `ResourceExtractor` del juego por tu cuenta, usa esos recursos y no extrae nada.
+MultiTracker trae incluidos los iconos de objetos y trinkets, los nombres y sus traducciones (unos 5 MB, en `data/resources/`), así que se abre al momento y no necesita extraer nada del juego. Esos archivos son del juego y pertenecen a Edmund McMillen y Nicalis: no forman parte de la licencia MIT de MultiTracker.
 
 El ejecutable no tiene firma digital, así que Windows puede mostrar un aviso. Para continuar, pulsa **Más información** y luego **Ejecutar de todas formas**.
 
@@ -48,6 +48,7 @@ Requiere [Node.js](https://nodejs.org) 24. Las herramientas de compilación (Ele
 
 - **Aplicación de escritorio:** `node build/run-desktop.js`.
 - **Sin Electron:** `iniciar.bat` sirve el panel en http://localhost:7374 con Node, y `ventana.bat` abre el tracker en una ventana de Microsoft Edge.
+- **Actualizar los recursos del juego:** `node build/update-resources.js` vuelve a generar `data/resources/` desde el juego instalado (tarda 2-3 minutos y usa 1,2 GB temporales). Hace falta cuando una actualización del juego añade objetos, trinkets o logros.
 - **Generar el ejecutable:** `node build/build-exe.js 1.7.0` crea `MultiTracker.exe` y el `.zip` en `dist/`. Solo incluye archivos que Git publicaría: lo ignorado nunca llega al `.exe`.
 
 ## Qué muestra
@@ -73,12 +74,11 @@ MultiTracker busca sola las carpetas, incluidas otras bibliotecas de Steam. Si n
 
 | Clave | Carpeta |
 | --- | --- |
-| `isaacDir` | Carpeta donde está instalado el juego, con `tools/ResourceExtractor` dentro |
-| `resourcesDir` | Recursos ya extraídos del juego, con `items.xml` dentro. Opcional: sin ella se extraen solos |
+| `resourcesDir` | Opcional. Recursos extraídos del juego, con `items.xml` dentro, para usarlos en lugar de los incluidos (por ejemplo, si una actualización del juego añade objetos antes de que salga una versión nueva de MultiTracker) |
 | `gameDir` | La que contiene `log.txt`, en `Documents/My Games/Binding of Isaac Repentance+` |
 | `steamUserdata` | `userdata` de Steam, donde están los guardados |
 
-El archivo debe estar junto a `MultiTracker.exe`. Tus ajustes se guardan en `userdata/`, también junto a él: `config.json` (guardado, idioma, opciones, apariencia, perfiles y temas propios), `windows.json` (posición de las ventanas), `playtime.json` (tiempo de juego de cada archivo) `resources/` (los recursos extraídos del juego) y, si eliges una, `background.*` (la imagen de fondo). Si mueves `MultiTracker.exe`, lleva `userdata/` con él: el tiempo registrado no se puede volver a calcular.
+El archivo debe estar junto a `MultiTracker.exe`. Tus ajustes se guardan en `userdata/`, también junto a él: `config.json` (guardado, idioma, opciones, apariencia, perfiles y temas propios), `windows.json` (posición de las ventanas), `playtime.json` (tiempo de juego de cada archivo) y, si eliges una, `background.*` (la imagen de fondo). Si mueves `MultiTracker.exe`, lleva `userdata/` con él: el tiempo registrado no se puede volver a calcular.
 
 ## Fuente Upheaval (opcional)
 
