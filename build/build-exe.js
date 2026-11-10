@@ -2,7 +2,7 @@
 // - MultiTracker-Setup-<versión>.exe: instalador. La versión instalada se actualiza sola desde las releases de GitHub
 //   y descarga solo lo que cambia gracias al .blockmap; latest.yml le dice cuál es la última versión.
 // - MultiTracker.exe: portable, un solo archivo sin instalar nada. También va en el .zip, con las licencias a la vista.
-// Uso: node build/build-exe.js 1.9.0. Después, node build/publish-release.js 1.9.0 los publica en GitHub.
+// Uso: node build/build-exe.js 1.9.0. Los cinco archivos de dist/ van en la release v1.9.0 de GitHub.
 // Solo incluye lo que Git publicaría: lo ignorado (userdata/, la fuente Upheaval...) nunca llega al programa.
 const fs = require('fs');
 const path = require('path');
@@ -62,7 +62,7 @@ function builderConfig() {
       multiLanguageInstaller: true, installerLanguages: ['en_US', 'es_ES', 'fr_FR', 'pt_BR', 'ru_RU'],
     },
     portable: { artifactName: 'MultiTracker.exe' },
-    // De aquí lee la versión instalada dónde buscar actualizaciones (app-update.yml). Publicar lo hace publish-release.js.
+    // De aquí lee la versión instalada dónde buscar actualizaciones (app-update.yml). Esto no publica nada.
     publish: [{ provider: 'github', owner: REPO.owner, repo: REPO.repo }],
   };
 }
@@ -97,7 +97,7 @@ async function main() {
 
   console.log(`Listo en ${DIST}:`);
   for (const f of fs.readdirSync(DIST).filter(f => fs.statSync(path.join(DIST, f)).isFile())) console.log(`  ${f}`);
-  console.log(`Para publicarlos: node build/publish-release.js ${VERSION}`);
+  console.log(`Estos cinco archivos van en la release v${VERSION} (latest.yml es imprescindible).`);
 }
 
 main().catch(e => { console.error(e.message || e); process.exit(1); });
