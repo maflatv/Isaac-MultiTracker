@@ -1,6 +1,8 @@
 // Publica en GitHub la release v<versión> con los cinco archivos que deja build/build-exe.js en dist/.
 // Uso: node build/publish-release.js 1.9.0
-// Antes: subir el commit y la etiqueta (git push origin main v1.9.0) y escribir las notas en build/notas/1.9.0.md.
+//      node build/publish-release.js 1.9.0 --notas   (solo cambia las notas de una release ya publicada)
+// Antes: subir el commit y la etiqueta (git push origin main v1.9.0) y escribir las notas en build/notas/1.9.0.md,
+// primero en inglés y después en una sección «# Español».
 // La credencial es GH_TOKEN o, si no está, la que Git ya usa para subir a GitHub (administrador de credenciales de
 // Windows). Solo se lee en este momento: no se guarda ni se muestra.
 // Al terminar comprueba que la release es la última y que su latest.yml es el de esta versión: es lo que leen las
@@ -44,7 +46,17 @@ function checkFiles() {
   return yml;
 }
 
+// Corrige el texto de una release publicada sin tocar sus archivos.
+async function updateNotes() {
+  if (!fs.existsSync(NOTES)) throw new Error(`Faltan las notas: ${path.relative(ROOT, NOTES)}`);
+  const release = await gh(`/releases/tags/${TAG}`);
+  if (!release) throw new Error(`No hay ninguna release publicada ${TAG}`);
+  await gh(`/releases/${release.id}`, { method: 'PATCH', body: JSON.stringify({ body: fs.readFileSync(NOTES, 'utf8') }) });
+  console.log(`Notas actualizadas: ${release.html_url}`);
+}
+
 async function main() {
+  if (process.argv.includes('--notas')) return updateNotes();
   const yml = checkFiles();
   if (!await gh(`/git/ref/tags/${TAG}`)) throw new Error(`La etiqueta ${TAG} no está en GitHub: git push origin main ${TAG}`);
 
