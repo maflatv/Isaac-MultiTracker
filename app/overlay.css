@@ -18,6 +18,9 @@ html, body { margin: 0; min-height: 100%; overflow: hidden; background: transpar
 .side .who { flex-wrap: wrap; gap: 0 8px; }
 .pages { display: flex; flex-direction: column; gap: 4px; }
 .pages > :not([hidden]) { animation: page-in .3s ease-out; }
+/* «Ambos»: el progreso se desvanece antes de cambiar entre iconos y texto, y vuelve a aparecer después. */
+.prog { transition: opacity var(--prog-fade, 600ms) ease; }
+.prog-out .prog { opacity: 0; }
 .side .meter { width: min(170px, 100%); }
 .side .tags { justify-content: flex-start; }
 .main { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: var(--row-gap); }
@@ -61,7 +64,21 @@ body.highlighting #view { opacity: 0; }
 .pips.done i.on { background: var(--done); }
 
 /* Estantería de objetos */
-.shelf { display: flex; flex-wrap: wrap; justify-content: var(--justify); gap: var(--icon-gap); }
+.shelf { position: relative; display: flex; flex-wrap: wrap; justify-content: var(--justify); gap: var(--icon-gap); }
+/* Estantería por páginas: solo se ve la actual, con un indicador discreto en la esquina. */
+.shelf > .item.off { display: none; }
+/* Al deslizar: la copia de la página que se va y el recorte para que nada se salga del recuadro. */
+.shelf.sliding { overflow: hidden; }
+.page-ghost { position: absolute; inset: 0; pointer-events: none; }
+.page-ghost > .item { position: absolute; margin: 0 !important; }
+/* Pasarela: una sola fila, más ancha que la ventana, que se desliza dentro de un recuadro que la recorta. */
+.marquee { min-width: 0; overflow: hidden; }
+.shelf.rolling { flex-wrap: nowrap; width: max-content; justify-content: flex-start; }
+.page-dots { position: absolute; z-index: 3; right: 0; bottom: 0; display: flex; gap: 3px; align-items: center; padding: 2px 4px; border-radius: 6px; background: rgba(0, 0, 0, .55); color: var(--text); font-size: var(--label); line-height: 1; pointer-events: none; }
+.page-dots i { width: 5px; height: 5px; border-radius: 50%; background: var(--text); opacity: .4; }
+.page-dots i.on { background: var(--accent); opacity: 1; }
+/* Con separadores de piso, en su franja de arriba: así no tapa ningún icono. */
+.shelf.floors .page-dots { top: 0; bottom: auto; }
 .item { position: relative; width: var(--icon); height: var(--icon); display: flex; align-items: center; justify-content: center; border-radius: 4px; font-size: 10px; text-align: center; }
 .item img { width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; filter: var(--icon-filter); }
 .item-name { max-width: 100%; max-height: 100%; overflow: hidden; }

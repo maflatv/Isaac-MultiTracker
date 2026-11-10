@@ -9,8 +9,8 @@ const QUEUED_SECONDS = 3;
 const MAX_BATCH = 3;
 // Los objetos iniciales de una partida nueva pueden llegar en lecturas posteriores a la seed.
 const NEW_RUN_GRACE_MS = 2000;
-// Tiempo de cada página cuando el progreso no cabe en el lateral del banner.
-const PAGE_MS = 5000;
+// Con más páginas que esto, el indicador de la estantería pasa de puntos a «2/9».
+const MAX_DOTS = 6;
 // Antes de ocultar objetos se prueban iconos más pequeños.
 // Quién lleva el objeto: su cabeza, sacada de los recursos del juego, o una letra si no están. La letra es la del
 // nombre en inglés, como en el juego (D de Dead para el Lázaro muerto); el nombre completo sale traducido.
@@ -68,6 +68,10 @@ const queue = [];
 let heroActive = false;
 let sidePages = [];
 let sidePage = 0;
+let sideWidthBoth = 0;
+// Páginas de la estantería (cada una, la lista de sus iconos) cuando no caben todos los objetos y se pasan páginas.
+let shelfPages = [];
+let shelfPage = 0;
 
 function el(tag, className, text) {
   const e = document.createElement(tag);
@@ -146,13 +150,24 @@ function achTile(src, title, done, value, fallback) {
   return t;
 }
 
+// Con «Ambos», el progreso alterna entre iconos y texto cada progressSwapSeconds, con un fundido de progressFadeMs.
+let progressMode = 'icons';
+const progressStyle = o => (o.progressStyle === 'both' ? progressMode : o.progressStyle);
+
 // Un guardado al 100% no tiene nada pendiente: no se muestra su progreso.
+// Todo lo que devuelve lleva la clase «prog»: es lo único que se desvanece al alternar iconos y texto.
 function progressBlocks(s) {
+  const [meters, tags] = progressContent(s);
+  for (const node of [meters, tags, ...meters.children]) node.classList.add('prog');
+  return [meters, tags];
+}
+
+function progressContent(s) {
   const p = s.progress;
   const meters = el('div', 'meters'), tags = el('div', 'tags');
   if (!p || p.complete) return [meters, tags];
   const { show, goals, watched, options } = s.config;
-  if (options.progressStyle === 'icons') return [meters, iconGrid(p, show, goals, watched, options)];
+  if (progressStyle(options) === 'icons') return [meters, iconGrid(p, show, goals, watched, options)];
   const add = (on, label, x) => { if (on && !(options.hideDone && x.done >= x.total)) meters.append(meter(label, x.done, x.total)); };
   add(show.achievements, tr('view.achievements'), p.achievements);
   add(show.collection, tr('view.items'), p.items);
@@ -219,7 +234,7 @@ function stripRow(s) {
 }
 
 function sideColumn(s) {
-  const side = el('div', 'side' + (s.config.options.progressStyle === 'icons' ? ' icons' : ''));
+  const side = el('div', 'side' + (progressStyle(s.config.options) === 'icons' ? ' icons' : ''));
   const who = whoBlock(s);
   const [meters, tags] = progressBlocks(s);
   const pages = el('div', 'pages');
@@ -236,9 +251,14 @@ function paginateSide(padding) {
   const who = view.querySelector('.side .who');
   const room = window.innerHeight - padding * 2 - (who ? who.offsetHeight + 4 : 0);
   splitTallBlocks(pages, room);
-  // Ancho fijo con todo visible: al rotar las páginas, los objetos no deben moverse.
+  // Ancho fijo con todo visible: al rotar las páginas, los objetos no deben moverse. Con «Ambos», el mayor de los
+  // anchos de iconos y de texto, para que la estantería tampoco se mueva al alternarlos.
   const side = view.querySelector('.side');
-  side.style.width = side.offsetWidth + 'px';
+  const both = current && current.config.options.progressStyle === 'both';
+  sideWidthBoth = both ? Math.max(sideWidthBoth, side.offsetWidth) : 0;
+  side.style.width = (both ? sideWidthBoth : side.offsetWidth) + 'px';
+  // El texto tiene un máximo más estrecho que los iconos (overlay.css): se iguala al ancho recordado.
+  if (both) side.style.maxWidth = sideWidthBoth + 'px';
   let page = [], used = 0;
   for (const unit of pages.children) {
     const h = unit.offsetHeight + 4;
@@ -268,11 +288,46 @@ function showSidePage() {
   sidePages.forEach((page, i) => page.forEach(unit => { unit.hidden = i !== sidePage; }));
 }
 
+// La columna lateral y la estantería pasan página a la vez, cada pageSeconds. Mientras se destaca un objeto,
+// la estantería se queda en su página para que se vea dónde cae.
+// Se comprueba a menudo para aplicar enseguida un cambio de los segundos y no depender de cuándo llega la configuración.
+let lastTurn = Date.now();
 setInterval(() => {
-  if (sidePages.length < 2) return;
-  sidePage = (sidePage + 1) % sidePages.length;
-  showSidePage();
-}, PAGE_MS);
+  const seconds = (current && current.config.options.pageSeconds) || 5;
+  if (Date.now() - lastTurn < seconds * 1000) return;
+  lastTurn = Date.now();
+  if (sidePages.length > 1) { sidePage = (sidePage + 1) % sidePages.length; showSidePage(); }
+  if (shelfPages.length > 1 && !heroActive) { shelfPage = (shelfPage + 1) % shelfPages.length; showShelfPage(true); }
+}, 250);
+// La pasarela vuelve a moverse al terminar de destacar un objeto.
+setInterval(() => {
+  if (marquee && !heroActive && marquee.playState === 'paused') marquee.play();
+}, 250);
+
+// «Ambos»: cada progressSwapSeconds el progreso se desvanece, cambia de iconos a texto (o al revés) y vuelve a aparecer.
+// La vista se redibuja entera, así que la columna lateral vuelve a repartir sus páginas para lo que se ve ahora.
+let lastSwap = Date.now();
+let swapping = false;
+setInterval(() => {
+  const o = current && current.config.options;
+  if (!o || o.progressStyle !== 'both' || swapping) { lastSwap = Date.now(); return; }
+  if (Date.now() - lastSwap < (o.progressSwapSeconds || 8) * 1000) return;
+  if (!current.progress || current.progress.complete) return;
+  swapping = true;
+  const fade = reducedMotion() ? 0 : o.progressFadeMs || 600;
+  document.documentElement.style.setProperty('--prog-fade', fade + 'ms');
+  document.body.classList.add('prog-out');
+  setTimeout(() => {
+    progressMode = progressMode === 'icons' ? 'text' : 'icons';
+    sidePage = 0;
+    render(current);
+    // Lo nuevo nace transparente; se fuerza el cálculo antes de quitar la clase para que aparezca con el fundido.
+    void view.offsetWidth;
+    document.body.classList.remove('prog-out');
+    lastSwap = Date.now();
+    swapping = false;
+  }, fade);
+}, 250);
 
 // Texto del objeto: nombre, descripción, piso y maldición del ciego.
 const itemInfo = i => `${i.desc ? ' — ' + i.desc : ''}${i.floorLabel ? ' (' + i.floorLabel + ')' : ''}${i.blind ? ' — ' + tr('view.blind') : ''}`;
@@ -346,7 +401,9 @@ function setOverlap(px) {
 // El código del piso no ocupa ancho propio: solo se aparta el piso siguiente si el código no cabe sobre sus objetos.
 // Cada objeto lleva un margen derecho de -overlap; el último del piso lo amplía si hace falta sitio para el código.
 function spaceFloorLabels(shelf) {
-  const tiles = [...shelf.querySelectorAll('.item[data-floor]')];
+  // Solo los de la página que se ve, si la estantería pasa páginas.
+  const tiles = [...shelf.querySelectorAll(':scope > .item[data-floor]:not(.off)')];
+  if (!tiles.length) return;
   const pitch = () => tiles[0].offsetWidth + parseFloat(getComputedStyle(shelf).columnGap) - overlap;
   let count = 0;
   const tight = shelf.classList.contains('tight');
@@ -482,13 +539,22 @@ function render(s) {
   fitShelf(options);
 }
 
-// Elige el mayor tamaño de icono en el que caben todos los objetos. Si no caben ni en el más pequeño, los superpone
-// lo justo para que se vea la lista entera en la misma ventana, dejando visible al menos SHOW_MIN de cada icono.
-// Solo si ni así caben, conserva los más recientes con un contador de los que no se ven.
+// Elige el mayor tamaño de icono en el que caben todos los objetos. Si no caben:
+// - «Pasar páginas» (overflow 'pages'): los iconos no bajan de pageMinIcon (o del tamaño fijo) y los objetos se
+//   reparten en páginas que van rotando.
+// - «Pasarela» ('marquee'): lo mismo, pero todos los objetos van en una sola fila que se desliza sin parar.
+// - «Encoger y superponer» ('shrink'): en el tamaño más pequeño los superpone lo justo para que se vea la lista entera,
+//   dejando visible al menos SHOW_MIN de cada icono. Solo si ni así caben, conserva los más recientes con un contador
+//   de los que no se ven.
 // Unas filas elegidas a mano se respetan aunque no quepan en la ventana.
 const SHOW_MIN = 0.35;
-function fitShelf({ padding, iconAuto, iconSize, layout, rows }) {
+function fitShelf({ padding, iconAuto, iconSize, layout, rows, overflow, pageMinIcon, pageDirection, marqueeSpeed }) {
   setOverlap(0);
+  const wasPaged = shelfPages.length > 1;
+  shelfPages = [];
+  // La pasarela sigue por donde iba aunque la vista se redibuje.
+  const marqueeAt = marquee ? marquee.currentTime || 0 : 0;
+  if (marquee) { marquee.cancel(); marquee = null; }
   const shelf = view.querySelector('.shelf');
   if (!shelf) return;
   const room = window.innerHeight - padding * 2;
@@ -503,6 +569,18 @@ function fitShelf({ padding, iconAuto, iconSize, layout, rows }) {
   let sizes = [iconSize];
   if (iconAuto) sizes = layout === 'banner' ? BANNER_ICON_SIZES.filter(size => size <= room) : [iconSize, ...FIT_ICON_SIZES.filter(size => size < iconSize)];
   if (!sizes.length) sizes = [FIT_ICON_SIZES[FIT_ICON_SIZES.length - 1]];
+  if (overflow === 'pages' || overflow === 'marquee') {
+    // Si ni el mínimo cabe en la ventana, el mayor tamaño que sí cabe.
+    const allowed = iconAuto ? sizes.filter(size => size >= (pageMinIcon || 0)) : sizes;
+    for (const size of allowed.length ? allowed : [sizes[0]]) if (tryLayout(size, 0)) return;
+    // Con «reducir movimiento» en Windows, la pasarela pasa a páginas.
+    if (overflow === 'marquee' && !reducedMotion()) {
+      rollShelf(shelf, sizes, tryLayout, { direction: pageDirection, speed: marqueeSpeed || 40, at: marqueeAt });
+      return;
+    }
+    paginateShelf(shelf, room, rows, wasPaged);
+    return;
+  }
   for (const size of sizes) if (tryLayout(size, 0)) return;
   // En el tamaño más pequeño: la menor superposición que haga caber todo.
   const smallest = sizes[sizes.length - 1];
@@ -538,6 +616,140 @@ function fitShelf({ padding, iconAuto, iconSize, layout, rows }) {
   }
 }
 
+// Pasarela: todos los objetos en una sola fila, con el mayor icono con el que cabe en alto (o el tamaño fijo), que se
+// desliza sin parar. Detrás va una copia de la fila para que, al acabar, vuelva a empezar sin saltos.
+// direction 'ltr': los objetos avanzan de izquierda a derecha. speed en píxeles por segundo; at, por dónde iba.
+let marquee = null;
+function rollShelf(shelf, sizes, tryLayout, { direction, speed, at }) {
+  const strip = el('div', 'marquee');
+  shelf.replaceWith(strip);
+  strip.append(shelf);
+  shelf.classList.add('rolling');
+  for (const size of sizes) if (tryLayout(size, 0)) break;
+  const tiles = [...shelf.querySelectorAll(':scope > .item')];
+  // En una sola fila sí caben: no hace falta moverla.
+  if (!tiles.length || shelf.offsetWidth <= strip.clientWidth) return;
+  for (const tile of tiles) {
+    const copy = tile.cloneNode(true);
+    copy.classList.remove('latest', 'fresh', 'pulse', 'landed');
+    delete copy.dataset.idx;
+    // Otro piso para los separadores: la copia empieza un tramo nuevo aunque siga el mismo piso.
+    if (copy.dataset.floor) copy.dataset.floor = 'copy:' + copy.dataset.floor;
+    copy.tipItem = tile.tipItem;
+    shelf.append(copy);
+  }
+  spaceFloorLabels(shelf);
+  const cycle = shelf.children[tiles.length].offsetLeft - tiles[0].offsetLeft;
+  const away = `translateX(${-cycle}px)`;
+  const frames = direction === 'rtl' ? [{ transform: 'none' }, { transform: away }] : [{ transform: away }, { transform: 'none' }];
+  const duration = (cycle / speed) * 1000;
+  marquee = shelf.animate(frames, { duration, iterations: Infinity });
+  marquee.currentTime = at % duration;
+  if (heroActive) marquee.pause();
+}
+
+// Reparte la estantería en páginas de filas enteras, tal como quedan con todos los objetos: al ocultar filas completas,
+// las demás no cambian. Se cuentan desde el final, para que la página de los objetos más recientes vaya llena.
+// Con filas elegidas a mano, cada página tiene esas filas aunque no quepan; si no, las que quepan en la ventana.
+// wasPaged: ya pasaba páginas y se sigue en la misma; si no, se empieza por la de los objetos más recientes.
+function paginateShelf(shelf, room, rows, wasPaged) {
+  const lines = [];
+  let top = null;
+  for (const tile of shelf.querySelectorAll('.item')) {
+    if (tile.offsetTop !== top) { lines.push([]); top = tile.offsetTop; }
+    lines[lines.length - 1].push(tile);
+  }
+  const split = per => {
+    const pages = [];
+    for (let end = lines.length; end > 0; end -= per) pages.unshift(lines.slice(Math.max(0, end - per), end).flat());
+    return pages;
+  };
+  const keep = wasPaged ? shelfPage : Infinity;
+  const allFit = () => shelfPages.every((_, n) => { shelfPage = n; showShelfPage(); return view.offsetHeight <= room; });
+  // Se empieza por las filas que caben según la altura de cada una, para no medir de más.
+  const pitch = lines.length > 1 ? lines[1][0].offsetTop - lines[0][0].offsetTop : 0;
+  let per = rows || Math.min(lines.length - 1, pitch ? Math.ceil(room / pitch) : lines.length - 1);
+  for (; per >= 1; per--) { shelfPages = split(per); if (rows || allFit()) break; }
+  if (per < 1) shelfPages = split(1);
+  shelfPage = Math.min(keep, shelfPages.length - 1);
+  showShelfPage();
+}
+
+// Muestra la página shelfPage. turn: viene del cambio automático de página y se anima con el efecto elegido.
+function showShelfPage(turn) {
+  const shelf = view.querySelector('.shelf');
+  if (!shelf) return;
+  const o = current ? current.config.options : {};
+  const effect = turn && !reducedMotion() ? o.pageEffect || 'slide' : 'none';
+  for (const old of shelf.querySelectorAll('.page-ghost')) old.remove();
+  const ghost = effect === 'slide' ? pageGhost(shelf) : null;
+  for (const old of shelf.querySelectorAll('.floor-mark.repeat, .page-dots')) old.remove();
+  shelfPages.forEach((page, n) => page.forEach(t => t.classList.toggle('off', n !== shelfPage)));
+  // Un piso que empieza en la página anterior repite su código al principio de esta.
+  const first = (shelfPages[shelfPage] || [])[0];
+  if (first && first.dataset.floor && !first.querySelector(':scope > .floor-mark')) {
+    let from = first.previousElementSibling;
+    while (from && !from.querySelector(':scope > .floor-mark')) from = from.previousElementSibling;
+    if (from) {
+      const mark = from.querySelector(':scope > .floor-mark').cloneNode(true);
+      mark.classList.add('repeat');
+      first.prepend(mark);
+    }
+  }
+  spaceFloorLabels(shelf);
+  if (shelfPages.length > 1 && o.pageDots) shelf.append(pageDots());
+  if (effect !== 'none') animatePage(shelf, ghost, effect, o);
+}
+
+// Copia de la página que se va, en su mismo sitio, para que salga deslizándose mientras entra la nueva.
+// Sin data-idx ni data-floor: no debe confundirse con los iconos de verdad.
+function pageGhost(shelf) {
+  const ghost = el('div', 'page-ghost');
+  for (const tile of shelf.querySelectorAll(':scope > .item:not(.off)')) {
+    const copy = tile.cloneNode(true);
+    copy.classList.remove('latest', 'fresh', 'pulse', 'landed');
+    delete copy.dataset.idx;
+    delete copy.dataset.floor;
+    Object.assign(copy.style, { left: tile.offsetLeft + 'px', top: tile.offsetTop + 'px' });
+    ghost.append(copy);
+  }
+  return ghost;
+}
+
+// Deslizar: la página sale hacia un lado y la nueva entra por el otro (pageDirection 'ltr': de izquierda a derecha).
+// Fundido: la nueva aparece poco a poco. Dura pageAnimMs.
+const PAGE_EASING = 'cubic-bezier(.45, 0, .25, 1)';
+function animatePage(shelf, ghost, effect, o) {
+  const opts = { duration: o.pageAnimMs || 600, easing: PAGE_EASING };
+  const tiles = [...shelf.querySelectorAll(':scope > .item:not(.off)')];
+  if (effect === 'fade') {
+    for (const t of tiles) t.animate([{ opacity: 0 }, { opacity: 1 }], opts);
+    return;
+  }
+  const shift = (o.pageDirection === 'rtl' ? -1 : 1) * shelf.clientWidth;
+  shelf.classList.add('sliding');
+  shelf.append(ghost);
+  ghost.animate([{ transform: 'none' }, { transform: `translateX(${shift}px)` }], opts);
+  for (const t of tiles) t.animate([{ transform: `translateX(${-shift}px)` }, { transform: 'none' }], opts);
+  setTimeout(() => { ghost.remove(); shelf.classList.remove('sliding'); }, opts.duration);
+}
+
+// Indicador de la página: un punto por página o, si son muchas, «2/9».
+function pageDots() {
+  const box = el('div', 'page-dots');
+  if (shelfPages.length > MAX_DOTS) box.textContent = `${shelfPage + 1}/${shelfPages.length}`;
+  else shelfPages.forEach((_, n) => box.append(el('i', n === shelfPage ? 'on' : '')));
+  return box;
+}
+
+// Antes de destacar un objeto se muestra la página donde está, para que se vea dónde cae.
+function revealTile(item) {
+  if (shelfPages.length < 2 || !Number.isInteger(item.idx)) return;
+  const n = shelfPages.findIndex(page => page.some(t => +t.dataset.idx === item.idx));
+  // Sin animación: los estilos «vuelo» y «foco» miden enseguida dónde está el icono.
+  if (n >= 0 && n !== shelfPage) { shelfPage = n; showShelfPage(); }
+}
+
 // ---------- Objeto recién tomado ----------
 function detectPickups(s) {
   if (!s.run) { seen.seed = null; seen.count = 0; return; }
@@ -554,8 +766,18 @@ function detectPickups(s) {
   seen.count = items.length;
 }
 
-// Icono del objeto en la estantería, si se ve.
-const findTile = item => (Number.isInteger(item.idx) && item.idx >= 0 ? view.querySelector(`.item[data-idx="${item.idx}"]`) : null);
+// Icono del objeto en la estantería, si se ve (en otra página no cuenta).
+// En la pasarela, solo si ahora está dentro de lo que se ve.
+function findTile(item) {
+  if (!Number.isInteger(item.idx) || item.idx < 0) return null;
+  const tile = view.querySelector(`.item:not(.off)[data-idx="${item.idx}"]`);
+  const strip = tile && tile.closest('.marquee');
+  if (strip) {
+    const t = tile.getBoundingClientRect(), s = strip.getBoundingClientRect();
+    if (t.left < s.left || t.right > s.right) return null;
+  }
+  return tile;
+}
 const reducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 // Duración del vuelo hasta el hueco del objeto, incluida en los segundos configurados.
 const FLY_MS = 750;
@@ -710,6 +932,9 @@ const MOVING = ['fly', 'ticker'];
 function playNext() {
   if (heroActive || !queue.length) return;
   const item = queue.shift();
+  revealTile(item);
+  // La pasarela se para mientras se destaca un objeto, para que no se mueva el icono al que va.
+  if (marquee) marquee.pause();
   const o = current ? current.config.options : {};
   const configured = o.highlightSeconds || 5;
   const seconds = queue.length ? Math.min(QUEUED_SECONDS, configured) : configured;
@@ -760,6 +985,9 @@ async function tick() {
 }
 
 window.addEventListener('resize', () => { if (current) render(current); });
+// Una fuente que llega después del primer dibujo cambia el ancho de los textos (el lateral, los códigos de piso) y,
+// con él, cuántos objetos caben por fila: lo calculado antes ya no sirve y la estantería se saldría de la ventana.
+document.fonts.addEventListener('loadingdone', () => { if (current) render(current); });
 
 // ---------- Descripción del objeto bajo el puntero ----------
 // La vista se redibuja con cada lectura: la franja se actualiza con el objeto que haya ahora bajo el puntero.

@@ -56,6 +56,15 @@ const DEFAULTS = {
     // Cómo se destaca el objeto recién tomado: pantalla completa, aviso en una esquina, vuelo hasta su hueco, foco sobre
     // él, marquesina o solo un pulso en su icono.
     highlightStyle: 'full',
+    // Si no caben los objetos: 'pages' los reparte en páginas que rotan cada pageSeconds (en automático, los iconos
+    // no bajan de pageMinIcon); 'shrink' encoge y superpone los iconos. pageSeconds vale también para la columna lateral.
+    overflow: 'pages', pageMinIcon: 32, pageSeconds: 5, pageDots: true,
+    // Cambio de página: deslizar (de izquierda a derecha o al revés), fundido o sin efecto, y cuánto dura en ms.
+    pageEffect: 'slide', pageDirection: 'ltr', pageAnimMs: 600,
+    // Velocidad de la pasarela ('marquee'), en píxeles por segundo. pageDirection también vale para ella.
+    marqueeSpeed: 40,
+    // Progreso con progressStyle 'both': alterna iconos y texto cada progressSwapSeconds, con un fundido de progressFadeMs.
+    progressSwapSeconds: 8, progressFadeMs: 600,
     // Tamaño del área útil de la ventana del tracker: por defecto, el de la ventana de Rebirth Item Tracker.
     viewWidth: 900, viewHeight: 121,
     // Maldición del ciego: 'floor' solo en el separador del piso, 'items' también en cada objeto, 'none' sin marca.
@@ -67,15 +76,16 @@ const DEFAULTS = {
 const LIMITS = {
   iconSize: [16, 96], rows: [0, 8], maxItems: [0, 200], highlightSeconds: [2, 20], fontSize: [10, 32], iconGap: [0, 16], rowGap: [0, 24], padding: [0, 32], radius: [0, 24], backgroundOpacity: [0, 100],
   viewWidth: [200, 3840], viewHeight: [60, 2160], whoOutlineSize: [1, 4], bgImageOpacity: [0, 100], bgImageScale: [10, 400], bgImageX: [0, 100], bgImageY: [0, 100],
-  sideWidth: [120, 400],
+  sideWidth: [120, 400], pageMinIcon: [16, 96], pageSeconds: [3, 20], pageAnimMs: [100, 2000], marqueeSpeed: [10, 300], progressSwapSeconds: [3, 60], progressFadeMs: [100, 3000],
 };
 const CHOICES = {
   layout: ['banner', 'wide'], removed: ['dim', 'hide'], markItem: ['none', 'latest', 'hover'], background: ['transparent', 'solid', 'brick'], textEffect: ['none', 'shadow', 'outline'],
-  iconEffect: ['none', 'glow', 'shadow'], progressStyle: ['icons', 'text'], pendingLook: ['color', 'gray'], align: ['left', 'center', 'right'], itemsPosition: ['above', 'below'],
+  iconEffect: ['none', 'glow', 'shadow'], progressStyle: ['icons', 'text', 'both'], pendingLook: ['color', 'gray'], align: ['left', 'center', 'right'], itemsPosition: ['above', 'below'],
   bgImageFit: ['cover', 'contain', 'stretch', 'tile', 'scale'], blindMark: ['floor', 'items', 'none'],
   whoOutline: ['none', 'outline', 'glow'],
   ownerBadgeSize: ['small', 'medium', 'large'], ownerBadgeCorner: ['bl', 'br', 'tl', 'tr'],
   highlightStyle: ['full', 'toast', 'fly', 'spotlight', 'ticker', 'pulse'],
+  overflow: ['pages', 'marquee', 'shrink'], pageEffect: ['slide', 'fade', 'none'], pageDirection: ['ltr', 'rtl'],
 };
 // Imagen de fondo: se reconoce por sus primeros bytes, no por lo que diga quien la envía.
 const BG_IMAGE_MAX_BYTES = 10 * 1024 * 1024;
@@ -85,7 +95,7 @@ const BG_IMAGE_TYPES = {
   gif: { mime: 'image/gif', test: b => /^GIF8[79]a$/.test(b.subarray(0, 6).toString('latin1')) },
   webp: { mime: 'image/webp', test: b => b.subarray(0, 4).toString('latin1') === 'RIFF' && b.subarray(8, 12).toString('latin1') === 'WEBP' },
 };
-const FLAGS = ['iconAuto', 'hideDone', 'floorGroups', 'transformsClose', 'bold', 'highlight', 'hoverDesc', 'ownerBadgeBg', 'sideAuto'];
+const FLAGS = ['iconAuto', 'hideDone', 'floorGroups', 'transformsClose', 'bold', 'highlight', 'hoverDesc', 'ownerBadgeBg', 'sideAuto', 'pageDots'];
 const COLORS = ['color', 'textColor', 'accentColor', 'doneColor', 'blindColor', 'whoOutlineColor'];
 // El nombre de la fuente acaba en CSS entre comillas dobles: se admiten los caracteres de los nombres de fuentes
 // instaladas (letras, números, espacios, guiones, puntos, paréntesis, &, + y apóstrofos), nunca comillas dobles ni barras.
@@ -129,7 +139,7 @@ class UserError extends Error {
 }
 
 // Las rutas llegan de fuera: así funciona igual por su cuenta, en la aplicación de escritorio o montado en otra aplicación.
-// options: { desktop, pickFile(initialDir, text), obsStatus(), onConfig(config) }.
+// options: { desktop, version, pickFile(initialDir, text), obsStatus(), onConfig(config) }.
 function createTracker({ resDir, gameDir, steamUserdata, dataDir }, options = {}) {
   const CONFIG_FILE = path.join(dataDir, 'config.json');
   const RUNS_FILE = path.join(dataDir, 'cache', 'runs.json');
@@ -325,7 +335,7 @@ function createTracker({ resDir, gameDir, steamUserdata, dataDir }, options = {}
     const lang = languageOf(config);
     const save = readProgress(config, lang);
     return {
-      lang, desktop: !!options.desktop, obs: options.obsStatus ? options.obsStatus() : null,
+      lang, desktop: !!options.desktop, version: options.version || null, obs: options.obsStatus ? options.obsStatus() : null,
       config, run: runView(lang), progress: save.progress,
       // Segundos jugados en el archivo elegido desde que se registra; null si no es un guardado conocido.
       playtime: timeIdOf(save.id, save.file) ? secondsOf(timeIdOf(save.id, save.file)) : null,

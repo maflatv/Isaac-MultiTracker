@@ -31,7 +31,9 @@ const DEPENDS = {
   iconSize: c => !c.options.iconAuto,
   maxItems: ITEMS_SHOWN, removed: ITEMS_SHOWN, markItem: ITEMS_SHOWN, hoverDesc: ITEMS_SHOWN, floorGroups: ITEMS_SHOWN,
   transformsClose: c => c.show.transforms,
-  pendingLook: c => c.options.progressStyle === 'icons',
+  pendingLook: c => c.options.progressStyle !== 'text',
+  progressSwapSeconds: c => c.options.progressStyle === 'both',
+  progressFadeMs: c => c.options.progressStyle === 'both',
   highlightSeconds: c => c.options.highlight,
   whoOutlineColor: c => c.options.whoOutline !== 'none',
   whoOutlineSize: c => c.options.whoOutline !== 'none',
@@ -47,6 +49,14 @@ const DEPENDS = {
   highlightStyle: c => c.options.highlight,
   sideAuto: c => c.options.layout === 'banner',
   sideWidth: c => c.options.layout === 'banner' && !c.options.sideAuto,
+  // El mínimo solo cuenta en tamaño automático: con tamaño fijo, las páginas usan ese tamaño.
+  overflow: ITEMS_SHOWN,
+  pageMinIcon: c => c.show.items && c.options.overflow !== 'shrink' && c.options.iconAuto,
+  marqueeSpeed: c => c.show.items && c.options.overflow === 'marquee',
+  pageDots: c => c.show.items && c.options.overflow === 'pages',
+  pageEffect: c => c.show.items && c.options.overflow === 'pages',
+  pageDirection: c => c.show.items && (c.options.overflow === 'marquee' || (c.options.overflow === 'pages' && c.options.pageEffect === 'slide')),
+  pageAnimMs: c => c.show.items && c.options.overflow === 'pages' && c.options.pageEffect !== 'none',
 };
 const MAIN = 'main';
 // Comunes a todos los perfiles: no se exportan ni se importan (la ventana es una sola y la imagen, un archivo).
@@ -638,6 +648,8 @@ async function init() {
   desktop = state.desktop;
   document.documentElement.lang = lang;
   I18N.apply(lang, document);
+  // Para saber qué versión tiene abierta quien informa de un fallo. «dev» al ejecutar desde el código.
+  $('appVersion').textContent = tr('about.version', { version: state.version || 'dev' });
 
   syncPreviewSize();
   initLanguage(choices.languages);

@@ -39,8 +39,10 @@
       <div id="showProgress" class="checks"></div>
       <div class="fields spaced">
         <label><span data-i18n="progress.style"></span>
-          <select data-option="progressStyle"><option value="icons" data-i18n="progress.icons"></option><option value="text" data-i18n="progress.text"></option></select>
+          <select data-option="progressStyle"><option value="icons" data-i18n="progress.icons"></option><option value="text" data-i18n="progress.text"></option><option value="both" data-i18n="progress.both"></option></select>
         </label>
+        <label><span data-i18n="progress.swapSeconds"></span> <span class="slider"><input type="range" data-option="progressSwapSeconds" min="3" max="60"><output></output></span></label>
+        <label><span data-i18n="progress.fadeMs"></span> <span class="slider"><input type="range" data-option="progressFadeMs" min="100" max="3000" step="50"><output></output></span></label>
         <label><span data-i18n="progress.pending"></span>
           <select data-option="pendingLook"><option value="color" data-i18n="progress.pendingColor"></option><option value="gray" data-i18n="progress.pendingGray"></option></select>
         </label>
@@ -135,6 +137,20 @@
         <label><span data-i18n="look.iconAuto"></span> <input type="checkbox" data-option="iconAuto"></label>
         <label><span data-i18n="look.iconSize"></span> <span class="slider"><input type="range" data-option="iconSize" min="16" max="96" step="4"><output></output></span></label>
         <label><span data-i18n="look.rows"></span> <span class="slider"><input type="range" data-option="rows" min="0" max="8"><output></output></span></label>
+        <label><span data-i18n="look.overflow"></span>
+          <select data-option="overflow"><option value="pages" data-i18n="look.overflowPages"></option><option value="marquee" data-i18n="look.overflowMarquee"></option><option value="shrink" data-i18n="look.overflowShrink"></option></select>
+        </label>
+        <label><span data-i18n="look.pageMinIcon"></span> <span class="slider"><input type="range" data-option="pageMinIcon" min="16" max="96" step="4"><output></output></span></label>
+        <label><span data-i18n="look.pageSeconds"></span> <span class="slider"><input type="range" data-option="pageSeconds" min="3" max="20"><output></output></span></label>
+        <label><span data-i18n="look.pageEffect"></span>
+          <select data-option="pageEffect"><option value="slide" data-i18n="look.pageSlide"></option><option value="fade" data-i18n="look.pageFade"></option><option value="none" data-i18n="look.none"></option></select>
+        </label>
+        <label><span data-i18n="look.pageDirection"></span>
+          <select data-option="pageDirection"><option value="ltr" data-i18n="look.pageLtr"></option><option value="rtl" data-i18n="look.pageRtl"></option></select>
+        </label>
+        <label><span data-i18n="look.marqueeSpeed"></span> <span class="slider"><input type="range" data-option="marqueeSpeed" min="10" max="300" step="5"><output></output></span></label>
+        <label><span data-i18n="look.pageAnimMs"></span> <span class="slider"><input type="range" data-option="pageAnimMs" min="100" max="2000" step="50"><output></output></span></label>
+        <label><span data-i18n="look.pageDots"></span> <input type="checkbox" data-option="pageDots"></label>
         <label><span data-i18n="look.iconGap"></span> <span class="slider"><input type="range" data-option="iconGap" min="0" max="16"><output></output></span></label>
         <label><span data-i18n="look.blindMark"></span>
           <select data-option="blindMark"><option value="floor" data-i18n="look.blindFloor"></option><option value="items" data-i18n="look.blindItems"></option><option value="none" data-i18n="look.blindNone"></option></select>
@@ -239,6 +255,7 @@
       <h2 data-i18n="about.title"></h2>
       <p data-i18n="about.lead"></p>
       <p class="about-author"><strong>Mafla</strong> · <span data-i18n="about.creator"></span></p>
+      <p class="note" id="appVersion"></p>
       <h3 data-i18n="about.social"></h3>
       <div class="social-links" id="socialLinks"></div>
       <h3><span aria-hidden="true" class="heart">♥</span> <span data-i18n="about.support"></span></h3>

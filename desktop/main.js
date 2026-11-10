@@ -4,7 +4,7 @@
 const path = require('path');
 const { app, BrowserWindow, Menu, dialog, protocol, screen, shell } = require('electron');
 const { BASE_DIR, APP_ROOT } = require('../lib/runtime.js');
-const { readJson, writeFile, cacheControl } = require('../lib/http.js');
+const { readJson, writeFile, cacheControl, send } = require('../lib/http.js');
 const { resolvePaths } = require('../paths.js');
 const { listen, DEFAULT_PORT } = require('../server.js');
 const { t, resolve } = require('../app/i18n.js');
@@ -62,7 +62,7 @@ function createWindow(options, title) {
 function openPanel() {
   if (panel) { if (panel.isMinimized()) panel.restore(); panel.focus(); return; }
   const saved = savedBounds('panel', PANEL_SIZE);
-  panel = createWindow({ ...saved, minWidth: 820, minHeight: 480 }, 'MultiTracker');
+  panel = createWindow({ ...saved, minWidth: 820, minHeight: 480 }, app.isPackaged ? `MultiTracker ${app.getVersion()}` : 'MultiTracker');
   if (saved.maximized) panel.maximize();
   panel.on('close', () => saveBounds('panel', { ...panel.getNormalBounds(), maximized: panel.isMaximized() }));
   panel.on('closed', () => { panel = null; });
@@ -136,11 +136,18 @@ function openFileDialog(initialDir, text) {
   }).then(r => (r.canceled ? null : r.filePaths[0]));
 }
 
+// OBS solo carga la vista: por este puerto no se cambia nada (configuración, fondo, selector de archivos), así que
+// ningún otro programa del PC puede tocar los ajustes a través de él. El panel usa su propio protocolo, sin puerto.
+function obsHandle(req, res, url, pathname) {
+  if (req.method !== 'GET') return send(res, 405, { error: 'Read-only' });
+  return tracker.handle(req, res, url, pathname);
+}
+
 // Abre o cierra el puerto para OBS según la opción del panel. Si el puerto está ocupado, se reintenta en el siguiente cambio.
 function syncObs(config) {
   if (config.obsServer && !obs.server) {
     obs.error = null;
-    obs.server = listen(tracker.handle, OBS_PORT, e => {
+    obs.server = listen(obsHandle, OBS_PORT, e => {
       obs.running = !e;
       if (e) { obs.error = e.code || String(e); obs.server = null; }
     });
@@ -170,6 +177,8 @@ function start() {
   const { createTracker } = require('../tracker.js');
   tracker = createTracker({ ...paths, dataDir: DATA_DIR }, {
     desktop: true,
+    // La del .exe (package.json de build/build-exe.js); desde el código no hay versión.
+    version: app.isPackaged ? app.getVersion() : null,
     pickFile: openFileDialog,
     onConfig: config => { syncObs(config); syncViewSize(); loadViewProfile(); },
     obsStatus: () => ({ running: obs.running, error: obs.error, port: OBS_PORT, url: `http://localhost:${OBS_PORT}/overlay.html` }),
