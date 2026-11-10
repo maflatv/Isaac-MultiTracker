@@ -2,9 +2,7 @@
 // - MultiTracker-Setup-<versión>.exe: instalador. La versión instalada se actualiza sola desde las releases de GitHub
 //   y descarga solo lo que cambia gracias al .blockmap; latest.yml le dice cuál es la última versión.
 // - MultiTracker.exe: portable, un solo archivo sin instalar nada. También va en el .zip, con las licencias a la vista.
-// Uso: node build/build-exe.js 1.9.0
-// Con la variable GH_TOKEN (un token de GitHub con permiso para escribir en el repositorio), además crea la release
-// v<versión> como borrador y sube los cinco archivos. Antes hay que subir el commit y la etiqueta v<versión>.
+// Uso: node build/build-exe.js 1.9.0. Después, node build/publish-release.js 1.9.0 los publica en GitHub.
 // Solo incluye lo que Git publicaría: lo ignorado (userdata/, la fuente Upheaval...) nunca llega al programa.
 const fs = require('fs');
 const path = require('path');
@@ -13,7 +11,6 @@ const { ROOT, WORK, ELECTRON, ELECTRON_UPDATER, installTools, installRuntime, ru
 
 const VERSION = process.argv[2];
 if (!/^\d+\.\d+\.\d+$/.test(VERSION || '')) throw new Error('Indica la versión: node build/build-exe.js 1.9.0');
-const TOKEN = process.env.GH_TOKEN || '';
 const REPO = { owner: 'maflatv', repo: 'Isaac-MultiTracker' };
 
 const DIST = path.join(ROOT, 'dist');
@@ -65,24 +62,9 @@ function builderConfig() {
       multiLanguageInstaller: true, installerLanguages: ['en_US', 'es_ES', 'fr_FR', 'pt_BR', 'ru_RU'],
     },
     portable: { artifactName: 'MultiTracker.exe' },
-    // De aquí lee la versión instalada dónde buscar actualizaciones (app-update.yml). Con GH_TOKEN, también se publica.
-    publish: [{ provider: 'github', owner: REPO.owner, repo: REPO.repo, releaseType: 'draft' }],
+    // De aquí lee la versión instalada dónde buscar actualizaciones (app-update.yml). Publicar lo hace publish-release.js.
+    publish: [{ provider: 'github', owner: REPO.owner, repo: REPO.repo }],
   };
-}
-
-// El .zip con el portable y las licencias no lo sube electron-builder: se añade a la misma release en borrador.
-async function uploadZip(file) {
-  const api = `https://api.github.com/repos/${REPO.owner}/${REPO.repo}`;
-  const headers = { Authorization: `Bearer ${TOKEN}`, Accept: 'application/vnd.github+json', 'User-Agent': 'multitracker-build' };
-  const releases = await (await fetch(`${api}/releases?per_page=30`, { headers })).json();
-  const release = Array.isArray(releases) && releases.find(r => r.tag_name === `v${VERSION}`);
-  if (!release) throw new Error(`No se encuentra la release v${VERSION} en GitHub`);
-  const old = release.assets.find(a => a.name === ZIP);
-  if (old) await fetch(`${api}/releases/assets/${old.id}`, { method: 'DELETE', headers });
-  const url = release.upload_url.replace(/\{.*\}$/, '') + '?name=' + encodeURIComponent(ZIP);
-  const r = await fetch(url, { method: 'POST', headers: { ...headers, 'Content-Type': 'application/zip' }, body: fs.readFileSync(file) });
-  if (!r.ok) throw new Error(`No se pudo subir ${ZIP}: HTTP ${r.status}`);
-  return release.html_url;
 }
 
 async function main() {
@@ -95,7 +77,7 @@ async function main() {
 
   const configFile = path.join(WORK, 'electron-builder.json');
   fs.writeFileSync(configFile, JSON.stringify(builderConfig(), null, 2));
-  run(process.execPath, [path.join(WORK, 'node_modules', 'electron-builder', 'cli.js'), '--win', '--projectDir', STAGE, '--config', configFile, '--publish', TOKEN ? 'always' : 'never']);
+  run(process.execPath, [path.join(WORK, 'node_modules', 'electron-builder', 'cli.js'), '--win', '--projectDir', STAGE, '--config', configFile, '--publish', 'never']);
 
   for (const f of ['MultiTracker.exe', SETUP, `${SETUP}.blockmap`, 'latest.yml']) fs.copyFileSync(path.join(OUT, f), path.join(DIST, f));
 
@@ -115,8 +97,7 @@ async function main() {
 
   console.log(`Listo en ${DIST}:`);
   for (const f of fs.readdirSync(DIST).filter(f => fs.statSync(path.join(DIST, f)).isFile())) console.log(`  ${f}`);
-  if (TOKEN) console.log(`Release en borrador con los archivos: ${await uploadZip(zip)}\nRevísala y publícala desde GitHub.`);
-  else console.log('Sin GH_TOKEN no se ha publicado nada: sube a mano los cinco archivos a la release v' + VERSION + '.');
+  console.log(`Para publicarlos: node build/publish-release.js ${VERSION}`);
 }
 
 main().catch(e => { console.error(e.message || e); process.exit(1); });
