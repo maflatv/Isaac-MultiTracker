@@ -10,7 +10,10 @@ const L = {
   seed: (seed = 'ABCD EFGH', mode = 'New', slot = 1) => `[INFO] - RNG Start Seed: ${seed} (123456789) [${mode}, ${slot}]`,
   player: subtype => `[INFO] - [Frame: 0] Initialized player with Variant 0 and Subtype ${subtype}`,
   level: (stage, type = 0) => `[INFO] - Level::Init m_Stage ${stage}, m_StageType ${type} Seed 2033709761`,
-  room: name => `[INFO] - Room 1.2(${name})`,
+  room: (name, key = '1.2') => `[INFO] - Room ${key}(${name})`,
+  // Sin número de frame: el juego lo escribe, pero solo importa para Glowing Hourglass.
+  transition: () => '[INFO] - Starting room transition (type 0) ',
+  stage: n => `[INFO] - [Frame ${n}] Starting stage transition (transition type: 0) `,
   flush: () => '[INFO] - item queue flush',
   add: (id, name = 'Item', player = 0, who = 'Isaac') => `[INFO] - Adding collectible ${id} (${name}) to player ${player} (${who}) from pool treasure`,
   remove: (id, player = 0) => `[INFO] - Removing collectible ${id} (Item) from player ${player} (Isaac)`,
@@ -40,6 +43,8 @@ function setup(t) {
 // Partida nueva con Isaac en el primer piso.
 const start = (write, character = 0) => write(L.seed(), L.player(character), L.level(1), L.room('Start Room'));
 const pick = (id, ...rest) => [L.flush(), L.add(id, ...rest)];
+// Entrar en una sala andando: siempre hay una transición antes. Con frame, la transición lo lleva.
+const go = (name, key = '1.3', frame) => [frame === undefined ? L.transition() : L.frame(frame), L.room(name, key)];
 
 test('un objeto recogido se añade en su piso y uno quitado se marca', t => {
   const { log, write, live } = setup(t);
@@ -75,7 +80,7 @@ test('Genesis quita todo al entrar en su sala; lo de misión vuelve a su piso', 
   start(write);
   write(...pick(327, 'The Polaroid'));
   write(L.level(2), ...pick(1));
-  write(L.remove(622), L.room('Genesis Room'));
+  write(L.remove(622), ...go('Genesis Room'));
   assert.deepStrictEqual(live(), []);
   write(L.add(327, 'The Polaroid'));
   assert.deepStrictEqual(live(), [327]);
@@ -88,7 +93,7 @@ test('lo del Esau del Alma de Jacob y Esaú desaparece al cambiar de sala', t =>
   write(...pick(1));
   write(...pick(2, 'Item', 1, 'Esau'));
   assert.strictEqual(log.run.items.find(i => i.id === 2).soul, true);
-  write(L.room('Normal Room'));
+  write(...go('Normal Room'));
   assert.deepStrictEqual(live(), [1]);
 });
 
@@ -108,7 +113,7 @@ test('lo que recoge el Keeper de Strawman es suyo y no se quita al cambiar de sa
   const heels = log.run.items.find(i => i.id === 30);
   assert.strictEqual(heels.owner, 'strawman');
   assert.strictEqual(heels.helper, true);
-  write(L.room('Normal Room'));
+  write(...go('Normal Room'));
   assert.deepStrictEqual(live(), [667, 30]);
 });
 
@@ -179,4 +184,69 @@ test('una línea a medio escribir se completa en la siguiente lectura', t => {
   fs.appendFileSync(file, line.slice(20) + '\n');
   log.poll();
   assert.deepStrictEqual(live(), [7]);
+});
+
+// Glowing Hourglass: el juego no escribe nada al usarlo. Vuelve a la sala anterior sin transición, o con el contador
+// de frames más bajo, y todo queda como al entrar en ella.
+test('Glowing Hourglass quita del todo lo tomado en la sala donde se usa y conserva lo de la anterior', t => {
+  const { log, write, live } = setup(t);
+  start(write);
+  write(...go('Sala A', '1.10'), ...pick(1));
+  write(...go('Sala B', '1.20'), ...pick(2));
+  write(L.room('Sala A', '1.10')); // rebobinado: sin transición
+  assert.deepStrictEqual(live(), [1]);
+  // Desaparece, no se marca: lo quitado sigue contando para las transformaciones y esto no debe contar.
+  assert.deepStrictEqual(log.run.items.map(i => i.id), [1]);
+  write(...go('Sala B', '1.20'), ...pick(2));
+  assert.deepStrictEqual(log.run.items.map(i => i.id), [1, 2]);
+});
+
+test('volver andando a una sala no deshace nada', t => {
+  const { log, write } = setup(t);
+  start(write);
+  write(...go('Sala A', '1.10'), ...pick(1));
+  write(...go('Sala B', '1.20'), ...pick(2));
+  write(...go('Sala A', '1.10'));
+  assert.deepStrictEqual(log.run.items.map(i => i.id), [1, 2]);
+});
+
+test('Glowing Hourglass también se reconoce si la transición vuelve al frame de la sala deshecha', t => {
+  const { log, write } = setup(t);
+  start(write);
+  write(...go('Sala A', '1.10', 100), ...pick(1));
+  write(...go('Sala B', '1.20', 400), ...pick(2));
+  write(...go('Sala A', '1.10', 400));
+  assert.deepStrictEqual(log.run.items.map(i => i.id), [1]);
+  // Lo siguiente vuelve a ser normal.
+  write(...go('Sala B', '1.20', 450), ...pick(3));
+  assert.deepStrictEqual(log.run.items.map(i => i.id), [1, 3]);
+});
+
+test('Glowing Hourglass en la primera sala de un piso vuelve al piso anterior sin lo tomado en el nuevo', t => {
+  const { log, write } = setup(t);
+  start(write);
+  write(...go('Sala A', '1.10'), ...pick(1));
+  write(L.stage(300), L.level(2), L.room('Start Room', '1.2'), ...pick(2));
+  write(L.level(1), L.room('Sala A', '1.10'));
+  assert.deepStrictEqual(log.run.items.map(i => i.id), [1]);
+  assert.deepStrictEqual(log.run.floors.map(f => f.stage), [1]);
+});
+
+test('Glowing Hourglass tras un reroll devuelve los objetos que tenía', t => {
+  const { log, write, live } = setup(t);
+  start(write);
+  for (const id of [1, 2, 3, 4, 5]) write(...pick(id));
+  write(...go('Sala de dados', '1.20'), ...[11, 12, 13, 14, 15].map(id => L.add(id)));
+  assert.deepStrictEqual(live(), [11, 12, 13, 14, 15]);
+  write(L.room('Start Room', '1.2'));
+  assert.deepStrictEqual(live(), [1, 2, 3, 4, 5]);
+  assert.deepStrictEqual(log.run.items.map(i => i.id), [1, 2, 3, 4, 5]);
+});
+
+test('una sala sin transición que no se había visitado no deshace nada', t => {
+  const { log, write } = setup(t);
+  start(write);
+  write(...go('Sala A', '1.10'), ...pick(1));
+  write(L.room('Sala X', '1.99'));
+  assert.deepStrictEqual(log.run.items.map(i => i.id), [1]);
 });

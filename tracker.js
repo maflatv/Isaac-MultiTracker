@@ -75,7 +75,7 @@ const DEFAULTS = {
 };
 const LIMITS = {
   iconSize: [16, 96], rows: [0, 8], maxItems: [0, 200], highlightSeconds: [2, 20], fontSize: [10, 32], iconGap: [0, 16], rowGap: [0, 24], padding: [0, 32], radius: [0, 24], backgroundOpacity: [0, 100],
-  viewWidth: [200, 3840], viewHeight: [60, 2160], whoOutlineSize: [1, 4], bgImageOpacity: [0, 100], bgImageScale: [10, 400], bgImageX: [0, 100], bgImageY: [0, 100],
+  viewWidth: [200, 3840], viewHeight: [60, 2160], whoOutlineSize: [1, 4], bgImageOpacity: [0, 100], bgImageScale: [10, 400], bgImageX: [-100, 200], bgImageY: [-100, 200],
   sideWidth: [120, 400], pageMinIcon: [16, 96], pageSeconds: [3, 20], pageAnimMs: [100, 2000], marqueeSpeed: [10, 300], progressSwapSeconds: [3, 60], progressFadeMs: [100, 3000],
 };
 const CHOICES = {
@@ -324,7 +324,7 @@ function createTracker({ resDir, gameDir, steamUserdata, dataDir }, options = {}
     const floor = r.floors[r.floors.length - 1];
     return {
       seed: r.seed, slot: r.slot, seconds: Math.round((r.frames || 0) / GAME_FPS),
-      character: characterName(r.character, lang),
+      character: characterName(r.character),
       floor: floor ? floorLabel(floor) : '',
       items,
       transforms: Object.keys(seen).map(k => ({ id: k, name: transformName(k, lang), count: seen[k].size, goal: TRANSFORM_GOAL })),

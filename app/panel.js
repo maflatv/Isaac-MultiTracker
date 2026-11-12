@@ -43,7 +43,7 @@ const DEPENDS = {
   radius: c => c.options.background !== 'transparent' || !!c.options.bgImage,
   bgImageOpacity: c => !!c.options.bgImage,
   bgImageFit: c => !!c.options.bgImage,
-  bgImageScale: c => !!c.options.bgImage && ['tile', 'scale'].includes(c.options.bgImageFit),
+  bgImageScale: c => !!c.options.bgImage && c.options.bgImageFit !== 'stretch',
   bgImageX: c => !!c.options.bgImage && c.options.bgImageFit !== 'stretch',
   bgImageY: c => !!c.options.bgImage && c.options.bgImageFit !== 'stretch',
   highlightStyle: c => c.options.highlight,
@@ -197,6 +197,17 @@ async function sendBackground(body) {
   if (r.ok) applyConfig(res);
 }
 
+// La vista previa llama a esto mientras se arrastra la imagen: se ve al momento y se guarda al soltarla.
+const BG_POS_LIMITS = [-100, 200];
+window.moveBgImage = (x, y, done) => {
+  const clamp = v => Math.min(BG_POS_LIMITS[1], Math.max(BG_POS_LIMITS[0], Math.round(v)));
+  config.options.bgImageX = clamp(x);
+  config.options.bgImageY = clamp(y);
+  for (const k of ['bgImageX', 'bgImageY']) showOption(document.querySelector(`[data-option="${k}"]`));
+  livePreview();
+  if (done) save();
+};
+
 function initBgImage() {
   const input = $('bgImageFile');
   $('bgImageChoose').addEventListener('click', () => input.click());
@@ -268,6 +279,7 @@ function initSavePicker(choices) {
 }
 
 function showOption(e) {
+  if (e.dataset.option === 'font') ensureFontOption(config.options.font);
   e[e.type === 'checkbox' ? 'checked' : 'value'] = config.options[e.dataset.option];
   const out = e.parentElement.querySelector('output');
   if (out) out.value = e.value;
@@ -538,14 +550,30 @@ function initTransfer() {
   });
 }
 
-// Las fuentes instaladas en el PC se añaden a las sugeridas. Windows tarda un momento en listarlas: no se espera.
+// Lista de fuentes: Upheaval (incluida) y luego todas las instaladas en el PC, por orden alfabético. Windows tarda un
+// momento en listarlas: hasta entonces se ven las sugeridas. Cada nombre se muestra con su propia fuente.
+const fontOption = name => {
+  const o = new Option(name, name);
+  o.style.fontFamily = `"${name}", system-ui, sans-serif`;
+  return o;
+};
+
+// La fuente guardada puede no estar instalada en este PC (un tema importado): se añade para no perderla.
+function ensureFontOption(name) {
+  const list = $('fonts');
+  if (name && ![...list.options].some(o => o.value === name)) list.append(fontOption(name));
+}
+
 async function initFonts() {
   const list = $('fonts');
-  const known = new Set([...list.options].map(o => o.value));
+  for (const o of list.options) o.style.fontFamily = `"${o.value}", system-ui, sans-serif`;
   try {
     const { fonts } = await fetch('api/fonts').then(r => r.json());
-    for (const name of fonts) if (!known.has(name)) list.append(new Option(name, name));
+    if (!fonts.length) return;
+    list.replaceChildren(fontOption('Upheaval'), ...fonts.filter(n => n !== 'Upheaval').map(fontOption));
   } catch { /* se quedan las sugeridas */ }
+  ensureFontOption(config.options.font);
+  list.value = config.options.font;
 }
 
 // Cambiar de idioma recarga el panel: así todos los textos, también los que vienen del servidor, salen ya traducidos.

@@ -13,7 +13,7 @@ const NEW_RUN_GRACE_MS = 2000;
 const MAX_DOTS = 6;
 // Antes de ocultar objetos se prueban iconos más pequeños.
 // Quién lleva el objeto: su cabeza, sacada de los recursos del juego, o una letra si no están. La letra es la del
-// nombre en inglés, como en el juego (D de Dead para el Lázaro muerto); el nombre completo sale traducido.
+// nombre en inglés, como en el juego (D de Dead Lazarus). Los nombres de personajes no se traducen.
 const OWNERS = {
   jacob: { key: 'view.jacob', letter: 'J' }, esau: { key: 'view.esau', letter: 'E' },
   lazarus: { key: 'view.lazarus', letter: 'L' }, lazarus_dead: { key: 'view.lazarusDead', letter: 'D' },
@@ -438,16 +438,38 @@ const TEXT_SCALE = {
 // Upheaval vale tanto incluida en app/ ("Upheaval") como instalada en Windows ("Upheaval TT (BRK)").
 const PIXEL_FONTS = /^Upheaval\b/i;
 
-// Imagen de fondo: en mosaico y en escala propia el tamaño parte del original, que se conoce al cargarla.
+// Imagen de fondo. Su posición es la de su centro, en % del recuadro (0 y 100 son los bordes; se puede sacar de ellos),
+// y la escala multiplica el tamaño de cada modo. Para colocarla en píxeles hace falta su tamaño original.
 const bgNatural = { key: '', width: 0, height: 0 };
-function bgSize(o) {
-  if (o.bgImageFit === 'cover' || o.bgImageFit === 'contain') return o.bgImageFit;
-  if (o.bgImageFit === 'stretch') return '100% 100%';
-  if (!bgNatural.width) return 'auto';
-  const k = o.bgImageScale / 100;
-  return `${Math.round(bgNatural.width * k)}px ${Math.round(bgNatural.height * k)}px`;
+const bar = document.getElementById('bar');
+let bgOptions = null;
+
+// Tamaño dibujado de la imagen en un recuadro de bw × bh, o null si aún no se conoce el original.
+function bgRect(o, bw, bh) {
+  const { width: nw, height: nh } = bgNatural, k = o.bgImageScale / 100;
+  if (!nw || !nh) return null;
+  if (o.bgImageFit === 'cover' || o.bgImageFit === 'contain') {
+    const f = (o.bgImageFit === 'cover' ? Math.max : Math.min)(bw / nw, bh / nh) * k;
+    return { w: nw * f, h: nh * f };
+  }
+  return { w: nw * k, h: nh * k };
 }
+
+// Coloca la imagen según el tamaño actual del recuadro: se repite al cargarla y cada vez que el recuadro cambia.
+function placeBg() {
+  const o = bgOptions;
+  if (!o || !o.bgImage) return;
+  const css = document.documentElement.style;
+  if (o.bgImageFit === 'stretch') { css.setProperty('--bg-size', '100% 100%'); css.setProperty('--bg-pos', '0 0'); return; }
+  const bw = bar.clientWidth, bh = bar.clientHeight, r = bgRect(o, bw, bh);
+  if (!r) { css.setProperty('--bg-size', o.bgImageFit === 'tile' || o.bgImageFit === 'scale' ? 'auto' : o.bgImageFit); css.setProperty('--bg-pos', '50% 50%'); return; }
+  css.setProperty('--bg-size', `${Math.round(r.w)}px ${Math.round(r.h)}px`);
+  css.setProperty('--bg-pos', `${Math.round(o.bgImageX / 100 * bw - r.w / 2)}px ${Math.round(o.bgImageY / 100 * bh - r.h / 2)}px`);
+}
+new ResizeObserver(placeBg).observe(bar);
+
 function bgImageVars(o) {
+  bgOptions = o;
   if (!o.bgImage) return { '--bg-image': 'none' };
   const url = new URL('background?v=' + encodeURIComponent(o.bgImage), location.href).href;
   if (bgNatural.key !== o.bgImage) {
@@ -456,14 +478,41 @@ function bgImageVars(o) {
     img.onload = () => {
       if (bgNatural.key !== o.bgImage) return;
       Object.assign(bgNatural, { width: img.naturalWidth, height: img.naturalHeight });
-      document.documentElement.style.setProperty('--bg-size', bgSize(o));
+      placeBg();
     };
     img.src = url;
   }
   return {
-    '--bg-image': `url("${url}")`, '--bg-size': bgSize(o), '--bg-pos': `${o.bgImageX}% ${o.bgImageY}%`,
+    '--bg-image': `url("${url}")`,
     '--bg-repeat': o.bgImageFit === 'tile' ? 'repeat' : 'no-repeat', '--bg-image-opacity': o.bgImageOpacity / 100,
   };
+}
+
+// En la vista previa del panel la imagen se arrastra con el ratón; el panel recibe la posición y la guarda al soltar.
+const dragHost = window.parent !== window && (() => { try { return typeof window.parent.moveBgImage === 'function' ? window.parent : null; } catch { return null; } })();
+const canDragBg = () => dragHost && bgOptions && bgOptions.bgImage && bgOptions.bgImageFit !== 'stretch';
+if (dragHost) {
+  let drag = null;
+  document.addEventListener('pointerdown', e => {
+    if (e.button !== 0 || !canDragBg()) return;
+    e.preventDefault();
+    drag = { x: e.clientX, y: e.clientY, bx: bgOptions.bgImageX, by: bgOptions.bgImageY, bw: bar.clientWidth || 1, bh: bar.clientHeight || 1 };
+    document.documentElement.setPointerCapture(e.pointerId);
+    document.body.classList.add('bg-dragging');
+  });
+  const at = e => [drag.bx + (e.clientX - drag.x) / drag.bw * 100, drag.by + (e.clientY - drag.y) / drag.bh * 100];
+  document.addEventListener('pointermove', e => {
+    document.body.classList.toggle('bg-draggable', !!canDragBg());
+    if (drag) dragHost.moveBgImage(...at(e), false);
+  });
+  const end = e => {
+    if (!drag) return;
+    dragHost.moveBgImage(...at(e), true);
+    drag = null;
+    document.body.classList.remove('bg-dragging');
+  };
+  document.addEventListener('pointerup', end);
+  document.addEventListener('pointercancel', end);
 }
 
 // Contorno de píxeles enteros alrededor de cada letra, como el texto del juego: una sombra por cada punto del anillo.
@@ -503,6 +552,7 @@ function applyStyle(o) {
     ...bgImageVars(o),
   };
   for (const [k, v] of Object.entries(vars)) document.documentElement.style.setProperty(k, v);
+  placeBg();
 }
 
 function render(s) {

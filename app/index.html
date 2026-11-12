@@ -117,10 +117,11 @@
       <div class="group" data-reset>
       <h3 data-i18n="look.text"></h3>
       <div class="fields">
-        <label><span data-i18n="look.font"></span> <input data-option="font" list="fonts" maxlength="60" spellcheck="false" autocomplete="off"></label>
-        <datalist id="fonts">
-          <option value="Upheaval"><option value="Segoe UI"><option value="Arial"><option value="Bahnschrift"><option value="Consolas"><option value="Georgia"><option value="Impact"><option value="Trebuchet MS"><option value="Verdana"><option value="Comic Sans MS">
-        </datalist>
+        <label><span data-i18n="look.font"></span>
+          <select data-option="font" id="fonts">
+            <option value="Upheaval">Upheaval</option><option value="Segoe UI">Segoe UI</option><option value="Arial">Arial</option><option value="Bahnschrift">Bahnschrift</option><option value="Consolas">Consolas</option><option value="Georgia">Georgia</option><option value="Impact">Impact</option><option value="Trebuchet MS">Trebuchet MS</option><option value="Verdana">Verdana</option><option value="Comic Sans MS">Comic Sans MS</option>
+          </select>
+        </label>
         <label><span data-i18n="look.fontSize"></span> <span class="slider"><input type="range" data-option="fontSize" min="10" max="32"><output></output></span></label>
         <label><span data-i18n="look.textEffect"></span>
           <select data-option="textEffect"><option value="none" data-i18n="look.none"></option><option value="shadow" data-i18n="look.shadow"></option><option value="outline" data-i18n="look.outline"></option></select>
@@ -220,8 +221,8 @@
           <select data-option="bgImageFit"><option value="cover" data-i18n="look.fitCover"></option><option value="contain" data-i18n="look.fitContain"></option><option value="stretch" data-i18n="look.fitStretch"></option><option value="tile" data-i18n="look.fitTile"></option><option value="scale" data-i18n="look.fitScale"></option></select>
         </label>
         <label><span data-i18n="look.bgImageScale"></span> <span class="slider"><input type="range" data-option="bgImageScale" min="10" max="400" step="5"><output></output></span></label>
-        <label><span data-i18n="look.bgImageX"></span> <span class="slider"><input type="range" data-option="bgImageX" min="0" max="100"><output></output></span></label>
-        <label><span data-i18n="look.bgImageY"></span> <span class="slider"><input type="range" data-option="bgImageY" min="0" max="100"><output></output></span></label>
+        <label><span data-i18n="look.bgImageX"></span> <span class="slider"><input type="range" data-option="bgImageX" min="-100" max="200"><output></output></span></label>
+        <label><span data-i18n="look.bgImageY"></span> <span class="slider"><input type="range" data-option="bgImageY" min="-100" max="200"><output></output></span></label>
       </div>
       <p class="note error" id="bgImageError"></p>
       <p class="note" data-i18n="look.bgImageNote"></p>
