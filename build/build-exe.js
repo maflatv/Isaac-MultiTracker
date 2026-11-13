@@ -4,27 +4,35 @@
 // - MultiTracker.exe: portable, un solo archivo sin instalar nada. También va en el .zip, con las licencias a la vista.
 // Uso: node build/build-exe.js 1.9.1. Los cinco archivos de dist/ van en la release v1.9.0 de GitHub.
 // Solo incluye lo que Git publicaría: lo ignorado (userdata/, la fuente Upheaval...) nunca llega al programa.
+// Con --avanzada genera la edición avanzada (splits de LiveSplit) en dist-avanzada/: otro programa, con su propio
+// nombre, carpeta de ajustes e instalación, que no se publica ni se actualiza solo. La normal no lleva sus archivos.
 const fs = require('fs');
 const path = require('path');
 const { execFileSync } = require('child_process');
 const { ROOT, WORK, ELECTRON, ELECTRON_UPDATER, installTools, installRuntime, run } = require('./tools.js');
 
 const VERSION = process.argv[2];
-if (!/^\d+\.\d+\.\d+$/.test(VERSION || '')) throw new Error('Indica la versión: node build/build-exe.js 1.9.1');
+if (!/^\d+\.\d+\.\d+$/.test(VERSION || '')) throw new Error('Indica la versión: node build/build-exe.js 1.9.1 [--avanzada]');
+const ADVANCED = process.argv.includes('--avanzada');
 const REPO = { owner: 'maflatv', repo: 'Isaac-MultiTracker' };
+const NAME = ADVANCED ? 'MultiTracker Avanzado' : 'MultiTracker';
+const FILE_NAME = ADVANCED ? 'MultiTracker-Avanzado' : 'MultiTracker';
+// Archivos que solo lleva la edición avanzada.
+const ADVANCED_FILES = ['lib/splitter.js', 'lib/splits.js', 'lib/livesplit.js', 'app/livesplit.html', 'app/livesplit.js', 'app/livesplit.css', 'app/livesplit-i18n.js'];
 
-const DIST = path.join(ROOT, 'dist');
+const DIST = path.join(ROOT, ADVANCED ? 'dist-avanzada' : 'dist');
 const STAGE = path.join(WORK, 'stage');
 const OUT = path.join(WORK, 'out');
 // Lo que necesita la aplicación en marcha. El resto del repositorio (README, pruebas, scripts .bat...) no va dentro.
 const APP_FILES = ['app', 'data', 'lib', 'desktop', 'tracker.js', 'paths.js', 'server.js', 'build/icon.ico', 'LICENSE'];
-const SETUP = `MultiTracker-Setup-${VERSION}.exe`;
-const ZIP = `MultiTracker-${VERSION}-windows-x64.zip`;
+const SETUP = `${FILE_NAME}-Setup-${VERSION}.exe`;
+const PORTABLE = `${FILE_NAME}.exe`;
+const ZIP = `${FILE_NAME}-${VERSION}-windows-x64.zip`;
 
 function stage() {
   fs.rmSync(STAGE, { recursive: true, force: true });
   const tracked = execFileSync('git', ['ls-files', '--cached', '--others', '--exclude-standard', '--', ...APP_FILES], { cwd: ROOT, encoding: 'utf8' })
-    .split('\n').filter(rel => rel && fs.existsSync(path.join(ROOT, rel)));
+    .split('\n').filter(rel => rel && fs.existsSync(path.join(ROOT, rel)) && (ADVANCED || !ADVANCED_FILES.includes(rel)));
   for (const rel of tracked) {
     const to = path.join(STAGE, rel);
     fs.mkdirSync(path.dirname(to), { recursive: true });
@@ -32,8 +40,10 @@ function stage() {
   }
   // electron-updater, para que la versión instalada se actualice. El portable lo lleva también, pero no lo usa.
   fs.cpSync(path.join(installRuntime(), 'node_modules'), path.join(STAGE, 'node_modules'), { recursive: true });
+  // La marca que lee lib/runtime.js para saber que es la edición avanzada.
+  if (ADVANCED) fs.writeFileSync(path.join(STAGE, 'edition.json'), JSON.stringify({ edition: 'avanzada' }));
   fs.writeFileSync(path.join(STAGE, 'package.json'), JSON.stringify({
-    name: 'multitracker', productName: 'MultiTracker', version: VERSION,
+    name: ADVANCED ? 'multitracker-avanzado' : 'multitracker', productName: NAME, version: VERSION,
     description: 'Item and Dead God progress tracker for The Binding of Isaac: Repentance+',
     author: 'Mafla', license: 'MIT', main: 'desktop/main.js',
     dependencies: { 'electron-updater': ELECTRON_UPDATER },
@@ -43,8 +53,8 @@ function stage() {
 
 function builderConfig() {
   return {
-    appId: 'io.github.maflatv.multitracker',
-    productName: 'MultiTracker',
+    appId: ADVANCED ? 'io.github.maflatv.multitracker.avanzado' : 'io.github.maflatv.multitracker',
+    productName: NAME,
     copyright: 'Copyright (c) 2026 Mafla',
     electronVersion: ELECTRON,
     // Por defecto electron-builder excluye la carpeta build/ del paquete, y ahí está el icono de las ventanas.
@@ -57,13 +67,14 @@ function builderConfig() {
     // ajustes (%APPDATA%\MultiTracker). En el idioma de Windows, entre los cinco de MultiTracker.
     nsis: {
       oneClick: false, perMachine: false, allowToChangeInstallationDirectory: true,
-      createDesktopShortcut: true, createStartMenuShortcut: true, shortcutName: 'MultiTracker',
+      createDesktopShortcut: true, createStartMenuShortcut: true, shortcutName: NAME,
       deleteAppDataOnUninstall: false, artifactName: SETUP,
       multiLanguageInstaller: true, installerLanguages: ['en_US', 'es_ES', 'fr_FR', 'pt_BR', 'ru_RU'],
     },
-    portable: { artifactName: 'MultiTracker.exe' },
+    portable: { artifactName: PORTABLE },
     // De aquí lee la versión instalada dónde buscar actualizaciones (app-update.yml). Esto no publica nada.
-    publish: [{ provider: 'github', owner: REPO.owner, repo: REPO.repo }],
+    // La edición avanzada no se publica: sin esto no busca las actualizaciones de la normal.
+    publish: ADVANCED ? null : [{ provider: 'github', owner: REPO.owner, repo: REPO.repo }],
   };
 }
 
@@ -79,13 +90,17 @@ async function main() {
   fs.writeFileSync(configFile, JSON.stringify(builderConfig(), null, 2));
   run(process.execPath, [path.join(WORK, 'node_modules', 'electron-builder', 'cli.js'), '--win', '--projectDir', STAGE, '--config', configFile, '--publish', 'never']);
 
-  for (const f of ['MultiTracker.exe', SETUP, `${SETUP}.blockmap`, 'latest.yml']) fs.copyFileSync(path.join(OUT, f), path.join(DIST, f));
+  for (const f of [PORTABLE, SETUP, ...(ADVANCED ? [] : [`${SETUP}.blockmap`, 'latest.yml'])]) fs.copyFileSync(path.join(OUT, f), path.join(DIST, f));
+  if (ADVANCED) {
+    console.log(`Listo en ${DIST}: ${SETUP} y ${PORTABLE} (edición avanzada, solo para uso local).`);
+    return;
+  }
 
   // El .exe ya lleva dentro las licencias de Electron y Chromium; el .zip las incluye también a la vista.
   const pack = path.join(WORK, 'pack');
   fs.rmSync(pack, { recursive: true, force: true });
   fs.mkdirSync(pack);
-  fs.copyFileSync(path.join(DIST, 'MultiTracker.exe'), path.join(pack, 'MultiTracker.exe'));
+  fs.copyFileSync(path.join(DIST, PORTABLE), path.join(pack, PORTABLE));
   fs.copyFileSync(path.join(__dirname, 'LEEME.txt'), path.join(pack, 'LEEME.txt'));
   fs.copyFileSync(path.join(ROOT, 'LICENSE'), path.join(pack, 'LICENSE.txt'));
   fs.copyFileSync(path.join(ROOT, 'data', 'LICENSE-RebirthItemTracker.txt'), path.join(pack, 'LICENSE-RebirthItemTracker.txt'));

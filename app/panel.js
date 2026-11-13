@@ -728,6 +728,7 @@ async function init() {
   config = state.config;
   lang = state.lang;
   desktop = state.desktop;
+  $('openLiveSplit').hidden = state.edition !== 'avanzada';
   document.documentElement.lang = lang;
   I18N.apply(lang, document);
   // Para saber qué versión tiene abierta quien informa de un fallo. «dev» al ejecutar desde el código.

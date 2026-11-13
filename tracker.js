@@ -140,7 +140,9 @@ class UserError extends Error {
 
 // Las rutas llegan de fuera: así funciona igual por su cuenta, en la aplicación de escritorio o montado en otra aplicación.
 // options: { desktop, version, pickFile(initialDir, text), obsStatus(), onConfig(config),
-//   update: { status(), action(name) } (solo la versión instalada: buscar, descargar e instalar actualizaciones) }.
+//   update: { status(), action(name) } (solo la versión instalada: buscar, descargar e instalar actualizaciones),
+//   edition: 'avanzada' en la edición avanzada, extensions: [createX(ctx)] (lo que solo lleva esa edición, como los
+//   splits de LiveSplit). Cada extensión recibe los momentos de la partida y atiende sus propias rutas de la API }.
 function createTracker({ resDir, gameDir, steamUserdata, dataDir }, options = {}) {
   const CONFIG_FILE = path.join(dataDir, 'config.json');
   const RUNS_FILE = path.join(dataDir, 'cache', 'runs.json');
@@ -256,7 +258,11 @@ function createTracker({ resDir, gameDir, steamUserdata, dataDir }, options = {}
     return same ? same.id : null;
   };
 
-  const runLog = new RunLog(path.join(gameDir, 'log.txt'), readJson(RUNS_FILE, {}), id => gameData().actives.has(id), id => gameData().quests.has(id), recordFrames);
+  // Las extensiones solo reciben lo que pasa a partir de ahora, no lo que se relee del log al abrir MultiTracker.
+  const extensions = [];
+  let logLive = false;
+  const onLogEvent = (type, d) => { if (logLive) for (const x of extensions) if (x.onLogEvent) x.onLogEvent(type, d); };
+  const runLog = new RunLog(path.join(gameDir, 'log.txt'), readJson(RUNS_FILE, {}), id => gameData().actives.has(id), id => gameData().quests.has(id), recordFrames, onLogEvent);
   // missing: el juego aún no ha creado log.txt (por ejemplo, antes de abrirlo por primera vez). No es un fallo.
   const logStatus = { ok: false, missing: false, error: null };
   function pollLog() {
@@ -273,6 +279,7 @@ function createTracker({ resDir, gameDir, steamUserdata, dataDir }, options = {}
   // Se sigue el log aunque no haya ninguna vista abierta, para detectar cuándo el juego lo reinicia.
   setInterval(pollLog, LOG_POLL_MS).unref();
   pollLog();
+  logLive = true;
 
   // Se conserva la última lectura válida: el juego puede estar escribiendo el archivo justo en ese momento.
   const saveCache = { id: null, mtime: 0, progress: null, error: null };
@@ -307,6 +314,10 @@ function createTracker({ resDir, gameDir, steamUserdata, dataDir }, options = {}
     return { id: s.id, file: s.file, mtime: s.mtime, progress: saveCache.progress, error: saveCache.error && describeError(saveCache.error, lang) };
   }
 
+  // ---------- Extensiones (edición avanzada) ----------
+  const currentSave = () => { try { return selectedSave(loadConfig()); } catch { return null; } };
+  for (const create of options.extensions || []) extensions.push(create({ dataDir, gameData, selectedSave: currentSave, currentRun: () => runLog.run }));
+
   function runView(lang) {
     const r = runLog.run;
     if (!r) return null;
@@ -336,7 +347,7 @@ function createTracker({ resDir, gameDir, steamUserdata, dataDir }, options = {}
     const lang = languageOf(config);
     const save = readProgress(config, lang);
     return {
-      lang, desktop: !!options.desktop, version: options.version || null, update: options.update ? options.update.status() : null, obs: options.obsStatus ? options.obsStatus() : null,
+      lang, desktop: !!options.desktop, version: options.version || null, edition: options.edition || null, update: options.update ? options.update.status() : null, obs: options.obsStatus ? options.obsStatus() : null,
       config, run: runView(lang), progress: save.progress,
       // Segundos jugados en el archivo elegido desde que se registra; null si no es un guardado conocido.
       playtime: timeIdOf(save.id, save.file) ? secondsOf(timeIdOf(save.id, save.file)) : null,
@@ -492,6 +503,10 @@ function createTracker({ resDir, gameDir, steamUserdata, dataDir }, options = {}
     if (method === 'GET' && pathname === '/api/fonts') return json(200, { fonts: await listFonts() });
     // Exigir JSON impide que una página web cualquiera lance estas acciones contra el servidor local.
     if (method === 'POST' && !String(contentType).startsWith('application/json')) return json(415, { error: 'Expected JSON' });
+    for (const x of extensions) {
+      const r = x.respond && await x.respond({ method, pathname, readJsonBody, lang: languageOf(loadConfig()) });
+      if (r) return r;
+    }
     if (method === 'POST' && Object.hasOwn(POST_ACTIONS, pathname)) {
       try {
         const body = await readJsonBody();

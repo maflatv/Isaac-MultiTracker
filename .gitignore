@@ -8,3 +8,7 @@
 
 # Fuente opcional: cada usuario la añade por su cuenta (consulta el README)
 /app/upheaval.ttf
+
+# Marca de la edición avanzada: solo la escribe build-exe.js dentro del programa
+/edition.json
+/dist-avanzada/

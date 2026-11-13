@@ -4,7 +4,7 @@
 const fs = require('fs');
 const path = require('path');
 const { app, BrowserWindow, Menu, dialog, protocol, screen, shell } = require('electron');
-const { BASE_DIR, APP_ROOT, IS_INSTALLED } = require('../lib/runtime.js');
+const { BASE_DIR, APP_ROOT, IS_INSTALLED, IS_ADVANCED, APP_NAME } = require('../lib/runtime.js');
 const { readJson, writeFile, cacheControl, send } = require('../lib/http.js');
 const { resolvePaths } = require('../paths.js');
 const { listen, DEFAULT_PORT } = require('../server.js');
@@ -63,7 +63,7 @@ function createWindow(options, title) {
 function openPanel() {
   if (panel) { if (panel.isMinimized()) panel.restore(); panel.focus(); return; }
   const saved = savedBounds('panel', PANEL_SIZE);
-  panel = createWindow({ ...saved, minWidth: 820, minHeight: 480 }, app.isPackaged ? `MultiTracker ${app.getVersion()}` : 'MultiTracker');
+  panel = createWindow({ ...saved, minWidth: 820, minHeight: 480 }, app.isPackaged ? `${APP_NAME} ${app.getVersion()}` : APP_NAME);
   if (saved.maximized) panel.maximize();
   panel.on('close', () => saveBounds('panel', { ...panel.getNormalBounds(), maximized: panel.isMaximized() }));
   panel.on('closed', () => { panel = null; });
@@ -93,7 +93,7 @@ const viewSize = () => {
 
 function openView() {
   if (view) { if (view.isMinimized()) view.restore(); view.focus(); return; }
-  view = createWindow({ ...savedBounds('view', VIEW_SIZE), ...viewSize(), useContentSize: true, minWidth: 200, minHeight: 60 }, 'MultiTracker · Tracker');
+  view = createWindow({ ...savedBounds('view', VIEW_SIZE), ...viewSize(), useContentSize: true, minWidth: 200, minHeight: 60 }, `${APP_NAME} · Tracker`);
   // Con useContentSize, x e y son la posición de la ventana y el ancho y el alto los del contenido.
   // Guardar la posición del contenido desplazaría la ventana el alto de la barra de título en cada sesión.
   view.on('close', () => {
@@ -182,7 +182,8 @@ let updater = null;
 const update = { state: 'idle', version: null, percent: 0, error: null, manual: false };
 
 function setupUpdater() {
-  if (!IS_INSTALLED) return;
+  // La edición avanzada no se publica: no tiene de dónde actualizarse.
+  if (!IS_INSTALLED || IS_ADVANCED) return;
   try { ({ autoUpdater: updater } = require('electron-updater')); } catch { return; }
   updater.autoDownload = false;
   updater.autoInstallOnAppQuit = true;
@@ -224,10 +225,24 @@ const updateStatus = () => ({ ...update, enabled: !!updater, installed: IS_INSTA
 // Sus ajustes van en %APPDATA%\MultiTracker. Quien venía del portable puede traer los suyos (configuración, perfiles,
 // temas, tiempo de juego, imagen de fondo) eligiendo la carpeta del MultiTracker.exe portable.
 const PORTABLE_DATA = ['config.json', 'playtime.json', 'windows.json', 'cache', 'background.png', 'background.jpg', 'background.gif', 'background.webp'];
+const copyData = from => {
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+  for (const f of PORTABLE_DATA) if (fs.existsSync(path.join(from, f))) fs.cpSync(path.join(from, f), path.join(DATA_DIR, f), { recursive: true });
+};
 function firstRun() {
   const config = path.join(DATA_DIR, 'config.json');
   if (!IS_INSTALLED || fs.existsSync(config)) return;
   const lang = resolve(app.getLocale());
+  // La edición avanzada, instalada junto a la normal, se lleva sus ajustes si se le pide.
+  const standard = path.join(app.getPath('appData'), 'MultiTracker', 'userdata');
+  if (IS_ADVANCED && fs.existsSync(path.join(standard, 'config.json'))) {
+    const { t: at } = require('../app/livesplit-i18n.js');
+    const answer = dialog.showMessageBoxSync({
+      type: 'question', title: APP_NAME, message: at(lang, 'install.importStandard'),
+      buttons: [at(lang, 'install.importYes'), at(lang, 'install.importNo')], defaultId: 0, cancelId: 1, noLink: true,
+    });
+    if (answer === 0) { copyData(standard); return; }
+  }
   const answer = dialog.showMessageBoxSync({
     type: 'question', title: 'MultiTracker', message: t(lang, 'install.importMessage'), detail: t(lang, 'install.importDetail'),
     buttons: [t(lang, 'install.importButton'), t(lang, 'install.freshButton')], defaultId: 0, cancelId: 1, noLink: true,
@@ -237,11 +252,7 @@ function firstRun() {
     if (!picked) break;
     // Vale la carpeta del .exe portable o su carpeta userdata.
     const from = [path.join(picked[0], 'userdata'), picked[0]].find(d => fs.existsSync(path.join(d, 'config.json')));
-    if (from) {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
-      for (const f of PORTABLE_DATA) if (fs.existsSync(path.join(from, f))) fs.cpSync(path.join(from, f), path.join(DATA_DIR, f), { recursive: true });
-      return;
-    }
+    if (from) { copyData(from); return; }
     dialog.showMessageBoxSync({ type: 'warning', title: 'MultiTracker', message: t(lang, 'install.notFound'), noLink: true });
   }
   // Sin importar: un archivo vacío (todo por defecto) para no volver a preguntar.
@@ -255,6 +266,8 @@ function start() {
   const { createTracker } = require('../tracker.js');
   tracker = createTracker({ ...paths, dataDir: DATA_DIR }, {
     desktop: true,
+    edition: IS_ADVANCED ? 'avanzada' : null,
+    extensions: IS_ADVANCED ? [require('../lib/splitter.js').createSplitter] : [],
     // La del .exe (package.json de build/build-exe.js); desde el código no hay versión.
     version: app.isPackaged ? app.getVersion() : null,
     update: { status: updateStatus, action: updateAction },
