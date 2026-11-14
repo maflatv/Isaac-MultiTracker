@@ -250,3 +250,61 @@ test('una sala sin transición que no se había visitado no deshace nada', t => 
   write(L.room('Sala X', '1.99'));
   assert.deepStrictEqual(log.run.items.map(i => i.id), [1]);
 });
+
+// ---------- Partidas online ----------
+const NET = {
+  lobby: () => '[INFO] - Menu Online Lobby Init',
+  user: (name, id) => `[INFO] - [Frame 0] Received Player Info message from user ${name} [${id}]`,
+  local: () => '[INFO] - [Frame: 0] Adding local player, device ID = 0 ',
+  remote: id => `[INFO] - [Frame: 0] Adding remote player, UserID = ${id}, device ID = 2 `,
+  coop: type => `[INFO] - [Frame: 0] Spawning Co-Op Player (ePlayerType = ${type}) `,
+};
+const ME = '76561198000000001', FRIEND = '76561198000000002', GONE = '76561198000000003';
+// Partida online: tú con Isaac y el otro con The Lost. Con lines = false, el reinicio, que no dice quién es cada uno.
+const netStart = (write, seed = 'NETS EED1', full = true) => write(
+  L.seed(seed, 'Net', 1),
+  ...(full ? [NET.local()] : []), L.player(0),
+  ...(full ? [NET.remote(FRIEND)] : []), NET.coop(10), L.player(10),
+  L.level(1), L.room('Start Room'));
+
+test('online: cada objeto es del jugador que lo toma, con su nombre de Steam', t => {
+  const { log, write } = setup(t);
+  log.localUser = () => ME;
+  write(NET.lobby(), NET.user('Otro', GONE), NET.user('Amigo', FRIEND), NET.user('Yo', ME));
+  netStart(write);
+  write(...pick(1, 'Item', 0, 'Isaac'), ...pick(2, 'Item', 1, 'The Lost'));
+  assert.deepStrictEqual(log.run.players.map(p => [p.local, p.character, p.name]), [[true, 0, 'Yo'], [false, 10, 'Amigo']]);
+  assert.strictEqual(log.run.character, 0);
+  assert.deepStrictEqual(log.run.items.map(i => i.player), [0, 1]);
+});
+
+test('online: al reiniciar la partida se repite el orden de los jugadores', t => {
+  const { log, write } = setup(t);
+  log.localUser = () => ME;
+  write(NET.lobby(), NET.user('Amigo', FRIEND), NET.user('Yo', ME));
+  netStart(write);
+  netStart(write, 'NETS EED2', false);
+  assert.strictEqual(log.run.seed, 'NETS EED2');
+  assert.deepStrictEqual(log.run.players.map(p => [p.local, p.character, p.name]), [[true, 0, 'Yo'], [false, 10, 'Amigo']]);
+});
+
+test('online: lo del Deathmatch del final no es de la partida', t => {
+  const { log, write } = setup(t);
+  netStart(write);
+  write(...pick(1, 'Item', 0, 'Isaac'));
+  write(...go('Deathmatch Machinegun SM', '30.8'), L.player(0), L.add(330, 'Soy Milk', 0), NET.coop(0), L.player(0), L.add(330, 'Soy Milk', 1));
+  assert.deepStrictEqual(log.run.items.map(i => i.id), [1]);
+  assert.strictEqual(log.run.players.length, 2);
+});
+
+test('online: la partida online no pisa la de la ranura 1', t => {
+  const { log, write, make } = setup(t);
+  start(write);
+  write(...pick(1));
+  netStart(write);
+  write(...pick(2, 'Item', 0, 'Isaac'));
+  assert.deepStrictEqual(log.runs['1'].items.map(i => i.id), [1]);
+  assert.deepStrictEqual(make(log.snapshot()).run.items.map(i => i.id), [2]);
+  write(L.seed('ABCD EFGH', 'Continue', 1));
+  assert.deepStrictEqual(log.run.items.map(i => i.id), [1]);
+});

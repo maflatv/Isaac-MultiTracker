@@ -1,0 +1,30 @@
+/* Página de LiveSplit (edición avanzada). Usa los colores y controles de panel.css. */
+.ls-main { grid-template-columns: 400px 1fr; }
+#mode { width: 100%; }
+#segmentsPane { display: flex; flex-direction: column; padding: 10px; min-width: 0; overflow: auto; }
+.ls-segments { margin: 0; padding: 0; list-style: none; display: grid; gap: 2px; counter-reset: seg; }
+.ls-segments li { display: grid; grid-template-columns: 34px 1fr auto; align-items: center; gap: 8px; padding: 4px 8px; background: var(--panel); border: 1px solid var(--line); border-radius: 4px; counter-increment: seg; }
+.ls-segments li::before { content: counter(seg); color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; }
+.ls-segments li.done { opacity: .6; }
+.tag.done { border-color: #8fd18f; color: #8fd18f; }
+.ls-segments li.current { border-color: var(--accent2); box-shadow: inset 3px 0 0 var(--accent2); opacity: 1; }
+.seg-name { font-weight: 600; overflow-wrap: anywhere; }
+.seg-conds { display: block; font-weight: 400; color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+.seg-tags { display: flex; gap: 6px; align-items: center; }
+.tag { font-size: 11px; padding: 1px 6px; border-radius: 10px; border: 1px solid var(--line); color: var(--muted); white-space: nowrap; }
+.tag.review { border-color: var(--accent2); color: var(--accent2); }
+.tag.manual { border-color: #ff9f9a; color: #ff9f9a; }
+.seg-tags button { padding: 1px 8px; font-size: 12px; }
+.ls-actions { margin: 0; padding: 0 0 0 16px; color: var(--muted); font-size: 12px; display: grid; gap: 2px; }
+.ls-actions time { color: var(--text); margin-right: 6px; font-variant-numeric: tabular-nums; }
+#sessionTime { margin: 0; font-size: 16px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.ls-editor { width: min(640px, calc(100vw - 32px)); }
+.ls-conds { margin: 0 0 8px; padding: 0; list-style: none; display: grid; gap: 4px; }
+.ls-conds li { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 3px 4px 3px 8px; background: var(--panel2); border: 1px solid var(--line); border-radius: 4px; }
+.ls-conds li button { padding: 0 8px; }
+.ls-add { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding-top: 8px; border-top: 1px solid var(--line); }
+.ls-add label { display: flex; align-items: center; gap: 6px; }
+.ls-add [data-cond] { display: inline-flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+#achSearch { width: 260px; }
+.ls-add input[type=number] { width: 80px; }
+.ls-editor-actions { justify-content: flex-end; margin-top: 12px; }

@@ -12,3 +12,6 @@
 # Marca de la edición avanzada: solo la escribe build-exe.js dentro del programa
 /edition.json
 /dist-avanzada/
+
+# Estado local de Wrangler al publicar relay/
+/relay/.wrangler/

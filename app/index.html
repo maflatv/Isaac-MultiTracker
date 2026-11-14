@@ -25,7 +25,12 @@
   <button type="button" id="updateLater" data-i18n="update.later"></button>
 </div>
 <main>
-  <form id="form">
+  <form id="form" data-tab="general">
+    <!-- Lo de varios jugadores va aparte: la mayoría juega solo y no lo necesita a primera vista. -->
+    <nav class="tabs" role="tablist">
+      <button type="button" role="tab" data-tab-button="general" data-i18n="tab.general"></button>
+      <button type="button" role="tab" data-tab-button="multi" data-i18n="tab.multi"></button>
+    </nav>
     <section>
       <h2 data-i18n="save.title"></h2>
       <select id="saveId" data-i18n-aria="save.aria"></select>
@@ -40,6 +45,78 @@
       <h2 data-i18n="run.title"></h2>
       <div id="showRun" class="checks"></div>
       <p class="note" id="logStatus"></p>
+      <div class="fields spaced">
+        <label><span data-i18n="run.viewLanguage"></span> <select data-option="viewLanguage" id="viewLanguage"></select></label>
+        <label><span data-i18n="run.gameNames"></span>
+          <select data-option="gameNames"><option value="translated" data-i18n="run.namesTranslated"></option><option value="original" data-i18n="run.namesOriginal"></option></select>
+        </label>
+      </div>
+      <p class="note" data-i18n="run.langNote"></p>
+    </section>
+    <section data-reset data-tab="multi">
+      <h2 data-i18n="run.coop"></h2>
+      <div id="showCoop" class="checks single"></div>
+      <div class="fields spaced">
+        <label><span data-i18n="run.coopItems"></span>
+          <select data-option="coopItems"><option value="all" data-i18n="run.coopAll"></option><option value="mine" data-i18n="run.coopMine"></option><option value="rows" data-i18n="run.coopRows"></option></select>
+        </label>
+        <label><span data-i18n="run.coopHighlight"></span>
+          <select data-option="coopHighlight"><option value="mine" data-i18n="run.coopHighlightMine"></option><option value="all" data-i18n="run.coopHighlightAll"></option></select>
+        </label>
+      </div>
+      <p class="note" data-i18n="run.coopNote"></p>
+    </section>
+    <section data-tab="multi">
+      <h2 data-i18n="share.title"></h2>
+      <div class="checks single"><label><input type="checkbox" id="shareOn"> <span data-i18n="share.on"></span></label></div>
+      <div class="share-code" id="shareCodeRow" hidden>
+        <span data-i18n="share.code"></span> <code id="shareCode"></code>
+        <button type="button" id="shareCopy" data-i18n="share.copy"></button>
+        <button type="button" id="shareRenew" data-i18n="share.renew"></button>
+      </div>
+      <p class="note" id="shareStatus"></p>
+      <p class="note" data-i18n="share.note"></p>
+    </section>
+    <section data-reset data-tab="multi">
+      <h2 data-i18n="watch.title"></h2>
+      <div class="name-row">
+        <input id="watchCode" maxlength="12" spellcheck="false" autocomplete="off" data-i18n-placeholder="watch.placeholder" data-i18n-aria="watch.placeholder">
+        <button type="button" id="watchStart" class="primary" data-i18n="watch.start"></button>
+        <button type="button" id="watchStop" data-i18n="watch.stop"></button>
+      </div>
+      <div class="fields spaced">
+        <label><span data-i18n="watch.delay"></span> <span class="slider"><input type="range" data-option="watchDelay" min="0" max="120"><output></output></span></label>
+      </div>
+      <p class="note" id="watchStatus"></p>
+      <div class="row-actions"><button type="button" id="watchLink" data-i18n="watch.copyLink"></button></div>
+      <p class="note" data-i18n="watch.note"></p>
+    </section>
+    <section data-tab="multi">
+      <h2 data-i18n="race.title"></h2>
+      <div id="raceSlots" class="race-slots"></div>
+      <div class="fields spaced">
+        <label><span data-i18n="race.layout"></span>
+          <select id="raceLayout"><option value="rows" data-i18n="race.rows"></option><option value="grid" data-i18n="race.grid"></option></select>
+        </label>
+        <label><span data-i18n="watch.delay"></span> <span class="slider"><input type="range" id="raceDelay" min="0" max="120"><output></output></span></label>
+        <label><span data-i18n="race.look"></span> <select id="raceProfile"></select></label>
+      </div>
+      <div class="row-actions">
+        <button type="button" id="raceCopy" data-i18n="race.copyLink"></button>
+        <button type="button" id="raceOpen" class="primary" data-i18n="race.open"></button>
+      </div>
+      <p class="note" id="raceStatus"></p>
+      <p class="note" data-i18n="race.note"></p>
+    </section>
+    <section data-reset>
+      <h2 data-i18n="run.sizes"></h2>
+      <div class="fields">
+        <label><span data-i18n="run.sizeChar"></span> <span class="slider"><input type="range" data-option="runCharScale" min="50" max="250" step="10"><output></output></span></label>
+        <label><span data-i18n="run.sizeInfo"></span> <span class="slider"><input type="range" data-option="runInfoScale" min="50" max="250" step="10"><output></output></span></label>
+        <label><span data-i18n="run.sizeTransforms"></span> <span class="slider"><input type="range" data-option="runTransformsScale" min="50" max="250" step="10"><output></output></span></label>
+        <label><span data-i18n="run.sizeDesc"></span> <span class="slider"><input type="range" data-option="runDescScale" min="50" max="250" step="10"><output></output></span></label>
+      </div>
+      <p class="note" data-i18n="run.sizeNote"></p>
     </section>
     <section data-reset>
       <h2 data-i18n="progress.title"></h2>

@@ -2,7 +2,7 @@
 // - MultiTracker-Setup-<versión>.exe: instalador. La versión instalada se actualiza sola desde las releases de GitHub
 //   y descarga solo lo que cambia gracias al .blockmap; latest.yml le dice cuál es la última versión.
 // - MultiTracker.exe: portable, un solo archivo sin instalar nada. También va en el .zip, con las licencias a la vista.
-// Uso: node build/build-exe.js 1.9.1. Los cinco archivos de dist/ van en la release v1.9.0 de GitHub.
+// Uso: node build/build-exe.js 1.10.0. Los cinco archivos de dist/ van en la release v1.9.0 de GitHub.
 // Solo incluye lo que Git publicaría: lo ignorado (userdata/, la fuente Upheaval...) nunca llega al programa.
 // Con --avanzada genera la edición avanzada (splits de LiveSplit) en dist-avanzada/: otro programa, con su propio
 // nombre, carpeta de ajustes e instalación, que no se publica ni se actualiza solo. La normal no lleva sus archivos.
@@ -12,7 +12,7 @@ const { execFileSync } = require('child_process');
 const { ROOT, WORK, ELECTRON, ELECTRON_UPDATER, installTools, installRuntime, run } = require('./tools.js');
 
 const VERSION = process.argv[2];
-if (!/^\d+\.\d+\.\d+$/.test(VERSION || '')) throw new Error('Indica la versión: node build/build-exe.js 1.9.1 [--avanzada]');
+if (!/^\d+\.\d+\.\d+$/.test(VERSION || '')) throw new Error('Indica la versión: node build/build-exe.js 1.10.0 [--avanzada]');
 const ADVANCED = process.argv.includes('--avanzada');
 const REPO = { owner: 'maflatv', repo: 'Isaac-MultiTracker' };
 const NAME = ADVANCED ? 'MultiTracker Avanzado' : 'MultiTracker';

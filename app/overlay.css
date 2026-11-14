@@ -32,11 +32,13 @@ body.highlighting #view { opacity: 0; }
 /* Franja superior: identidad, medidores y etiquetas */
 .strip { display: flex; flex-wrap: wrap; align-items: center; justify-content: var(--justify); gap: 6px 18px; }
 .who { display: flex; align-items: baseline; gap: 8px; padding-left: 8px; border-left: 3px solid var(--accent); }
-.who strong { font-size: var(--large); line-height: 1.15; }
+.who strong { font-size: var(--run-char, var(--large)); line-height: 1.15; }
+.who .runner { color: var(--accent); font-size: var(--run-char, var(--large)); line-height: 1.15; }
+.who .run-info { font-size: var(--run-info, 1em); }
 .who span { opacity: .8; font-weight: 400; }
 .streak { font-size: var(--small); font-weight: 400; }
 .streak b { color: var(--accent); font-weight: 600; }
-.who code { font: inherit; font-size: var(--small); font-weight: 400; opacity: .7; }
+.who code { font: inherit; font-size: var(--run-seed, var(--small)); font-weight: 400; opacity: .7; }
 /* Resaltado: contorno o brillo en cada letra. Atenuar la seed o el piso apagaría también su contorno. */
 .who { text-shadow: var(--who-shadow); }
 .who-highlight .who span, .who-highlight .who code { opacity: 1; }
@@ -94,6 +96,20 @@ body.highlighting #view { opacity: 0; }
 .shelf > .item:hover { z-index: 2; }
 /* Separador de piso como el de Rebirth Item Tracker: un ángulo sobre el primer objeto, con el código encima de la línea */
 .shelf.floors { padding-top: var(--floor-h); row-gap: calc(var(--floor-h) + var(--icon-gap)); }
+/* Partidas online en «Una fila por jugador»: un salto de línea sin alto propio entre los objetos de cada jugador. */
+/* Una línea de flex no puede medir menos de 0, así que el salto añadiría un hueco entre filas más: en este modo, el
+   espacio entre filas lo pone el margen inferior de cada icono, y el de la última fila se compensa. */
+.shelf.by-player { --row-g: var(--icon-gap); row-gap: 0; margin-bottom: calc(-1 * var(--row-g)); }
+.shelf.by-player.floors { --row-g: calc(var(--floor-h) + var(--icon-gap)); }
+.shelf.by-player > .item { margin-bottom: var(--row-g); }
+.player-break { flex: 0 0 100%; height: 0; }
+.shelf.rolling .player-break { display: none; }
+/* Quién tomó el objeto en una partida online: un círculo de su color con su inicial, en la esquina contraria a la del
+   dueño (Jacob y Esaú, Tainted Lazarus), que crece con el icono. */
+.player-badge { --pb: max(12px, calc(var(--icon) * var(--badge-scale, .45) * .8)); position: absolute; z-index: 1; right: 0; top: 0; width: var(--pb); height: var(--pb);
+  border-radius: 50%; box-shadow: 0 0 0 1px #000; color: #000; font: 700 calc(var(--pb) * .7)/var(--pb) system-ui, sans-serif; text-align: center; text-shadow: none; pointer-events: none; }
+[data-badge-corner="tr"] .player-badge { top: auto; bottom: 0; right: auto; left: 0; }
+.player-tag .player-badge { --pb: 1.1em; position: static; display: inline-block; margin-right: 4px; vertical-align: -.15em; font-size: .75em; line-height: 1.45em; }
 .floor-mark { position: absolute; z-index: 1; left: 0; top: 0; width: 47%; height: 75%; border-left: 1px solid var(--text); border-top: 1px solid var(--text); pointer-events: none; }
 .floor-mark.blind { border-color: var(--blind); }
 .floor-label { position: absolute; left: 2px; bottom: calc(100% + 1px); font-size: var(--label); font-weight: 600; line-height: var(--floor-h); white-space: nowrap; }
@@ -140,7 +156,8 @@ body.highlighting #view { opacity: 0; }
 .item.more { color: var(--accent); font-size: var(--label); font-weight: 600; }
 .waiting { opacity: .7; font-size: var(--small); font-weight: 400; }
 .hero-blind { color: var(--blind); }
-.desc { font-weight: 400; }
+.desc { font-weight: 400; font-size: var(--run-desc, 1em); }
+.pips.run-tf { font-size: var(--run-tf, var(--small)); }
 .desc strong { font-weight: 600; }
 
 /* Objeto recién tomado: entrada de .9s (INTRO_MS en overlay.js), luego los segundos configurados */

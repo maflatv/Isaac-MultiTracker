@@ -1,0 +1,12 @@
+name = "multitracker-relay"
+main = "worker.js"
+compatibility_date = "2025-06-01"
+
+[[durable_objects.bindings]]
+name = "ROOMS"
+class_name = "Room"
+
+# Durable Objects con almacenamiento SQLite: los que entran en el plan gratuito de Cloudflare.
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Room"]

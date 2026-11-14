@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>MultiTracker · LiveSplit</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="panel.css">
+<link rel="stylesheet" href="livesplit.css">
+</head>
+<body>
+<header>
+  <h1><a class="back" href="./" data-i18n-title="page.back" data-i18n-aria="page.back">←</a>MultiTracker · <span data-i18n="page.title"></span></h1>
+</header>
+<main class="ls-main">
+  <div id="form">
+    <section>
+      <h2 data-i18n="conn.title"></h2>
+      <div class="checks single"><label><input type="checkbox" data-setting="enabled"> <span data-i18n="conn.enabled"></span></label></div>
+      <div class="fields spaced"><label><span data-i18n="conn.port"></span> <input type="number" data-setting="port" min="1" max="65535"></label></div>
+      <p class="note" id="connStatus"></p>
+      <p class="note" id="connHelp" data-i18n="conn.help" hidden></p>
+      <p class="note error" id="mismatch" hidden></p>
+    </section>
+    <section>
+      <h2 data-i18n="mode.title"></h2>
+      <select data-setting="mode" id="mode"></select>
+      <p class="note" id="modeAbout"></p>
+      <div class="fields spaced">
+        <label data-for-mode="blocks"><span data-i18n="mode.blockSize"></span> <input type="number" data-setting="blockSize" min="8" max="320"></label>
+        <label data-for-mode="runs"><span data-i18n="mode.runCount"></span> <input type="number" data-setting="runCount" min="5" max="500"></label>
+      </div>
+    </section>
+    <section>
+      <h2 data-i18n="opt.title"></h2>
+      <div class="checks single">
+        <label><input type="checkbox" data-setting="autoStart"> <span id="autoStartLabel"></span></label>
+        <label data-for-family="deadgod"><input type="checkbox" data-setting="pauseOnClose"> <span data-i18n="opt.pauseOnClose"></span></label>
+        <label data-for-family="deadgod"><input type="checkbox" data-setting="checkNames"> <span data-i18n="opt.checkNames"></span></label>
+        <label data-for-family="single"><input type="checkbox" data-setting="autoReset"> <span data-i18n="opt.autoReset"></span></label>
+        <label data-for-family="single"><input type="checkbox" data-setting="gameTime"> <span data-i18n="opt.gameTime"></span></label>
+      </div>
+    </section>
+    <section data-for-family="deadgod">
+      <h2 data-i18n="session.title"></h2>
+      <p id="sessionTime"></p>
+      <p class="note" id="sessionSave"></p>
+      <p class="note" data-i18n="session.note"></p>
+      <div class="row-actions"><button type="button" id="sessionReset" data-i18n="session.reset"></button></div>
+    </section>
+    <section>
+      <h2 data-i18n="route.title"></h2>
+      <p class="note" id="routeSummary"></p>
+      <div class="row-actions">
+        <button type="button" id="importLss" data-i18n="route.import"></button>
+        <button type="button" id="exportLss" data-i18n="route.export"></button>
+        <input type="file" id="lssFile" accept=".lss" hidden>
+      </div>
+      <p class="note" data-i18n="route.exportNote"></p>
+      <p class="note error" id="routeError"></p>
+    </section>
+    <section>
+      <h2 data-i18n="log.title"></h2>
+      <ul id="actions" class="ls-actions"></ul>
+    </section>
+  </div>
+  <section id="segmentsPane">
+    <h2 data-i18n="seg.title"></h2>
+    <p class="note" id="segEmpty" data-i18n="seg.empty" hidden></p>
+    <ol id="segments" class="ls-segments"></ol>
+  </section>
+</main>
+<dialog id="editor" class="ls-editor">
+  <h2 id="editorTitle"></h2>
+  <ul id="condList" class="ls-conds"></ul>
+  <p class="note" id="condNone" data-i18n="edit.none" hidden></p>
+  <div class="ls-add">
+    <label><span data-i18n="edit.type"></span>
+      <select id="condType">
+        <option value="ach" data-i18n="cond.ach"></option>
+        <option value="mark" data-i18n="cond.mark"></option>
+        <option value="challenge" data-i18n="cond.challenge"></option>
+        <option value="counter" data-i18n="cond.counter"></option>
+        <option value="achCount" data-i18n="cond.achCount"></option>
+        <option value="collection" data-i18n="cond.collection"></option>
+      </select>
+    </label>
+    <span data-cond="ach"><input id="achSearch" list="achList" data-i18n-placeholder="cond.search" spellcheck="false"><datalist id="achList"></datalist></span>
+    <span data-cond="mark"><select id="markRow"></select> <select id="markCol"></select> <select id="markMin"></select></span>
+    <span data-cond="challenge"><input type="number" id="challengeId" min="1" max="99" value="1"></span>
+    <span data-cond="counter"><select id="counterId"></select> ≥ <input type="number" id="counterMin" min="1" value="1"></span>
+    <span data-cond="achCount"><input type="number" id="achCountMin" min="1" max="999" value="64"></span>
+    <button type="button" id="condAdd" class="primary" data-i18n="edit.add"></button>
+  </div>
+  <div class="row-actions ls-editor-actions">
+    <button type="button" id="markSure" data-i18n="edit.markSure"></button>
+    <button type="button" id="editorClose" data-i18n="edit.close"></button>
+  </div>
+</dialog>
+<script src="i18n.js"></script>
+<script src="livesplit-i18n.js"></script>
+<script src="livesplit.js"></script>
+</body>
+</html>

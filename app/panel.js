@@ -3,6 +3,7 @@
 if (location.pathname === '/') document.querySelector('a.back').remove();
 // «Acerca de» lleva al apartado del final del panel y lo resalta un momento.
 document.getElementById('about').addEventListener('click', () => {
+  showTab('general');
   const box = document.getElementById('aboutBox');
   box.scrollIntoView({ behavior: 'smooth', block: 'start' });
   box.classList.remove('flash');
@@ -31,6 +32,12 @@ const DEPENDS = {
   iconSize: c => !c.options.iconAuto,
   maxItems: ITEMS_SHOWN, removed: ITEMS_SHOWN, markItem: ITEMS_SHOWN, hoverDesc: ITEMS_SHOWN, floorGroups: ITEMS_SHOWN,
   transformsClose: c => c.show.transforms,
+  runCharScale: c => c.show.character,
+  // Con «Solo los míos» ya solo cuenta lo propio.
+  coopHighlight: c => c.options.coopItems !== 'mine',
+  runInfoScale: c => c.show.floor || c.show.seed || c.show.runTime,
+  runTransformsScale: c => c.show.transforms,
+  runDescScale: c => c.show.description,
   pendingLook: c => c.options.progressStyle !== 'text',
   progressSwapSeconds: c => c.options.progressStyle === 'both',
   progressFadeMs: c => c.options.progressStyle === 'both',
@@ -462,6 +469,7 @@ function fillProfileSelects() {
     select.value = value;
   }
   $('profileRename').disabled = $('profileDelete').disabled = config.profile === MAIN;
+  fillRaceProfile();
 }
 
 async function profileRequest(body, after) {
@@ -577,10 +585,182 @@ async function initFonts() {
 }
 
 // Cambiar de idioma recarga el panel: así todos los textos, también los que vienen del servidor, salen ya traducidos.
+// ---------- Compartir la partida y ver la de otra persona ----------
+function renderShare(sh) {
+  if (!sh) return;
+  const on = $('shareOn');
+  if (on !== document.activeElement) on.checked = sh.enabled;
+  on.disabled = !sh.available;
+  $('shareCodeRow').hidden = !(sh.enabled && sh.code);
+  $('shareCode').textContent = sh.code;
+  const status = !sh.available ? 'share.unavailable' : !sh.enabled ? null
+    : sh.status === 'ok' ? 'share.live' : sh.status === 'error' ? 'share.error.' + sh.error : 'share.connecting';
+  $('shareStatus').className = 'note' + (sh.enabled && sh.status === 'error' ? ' error' : '');
+  $('shareStatus').textContent = status ? tr(status, { n: sh.watchers }) : '';
+}
+
+function renderWatch(src) {
+  const code = config.options.watchCode;
+  $('watchStop').disabled = !code;
+  if (document.activeElement !== $('watchCode') && !$('watchCode').dataset.dirty) $('watchCode').value = code;
+  if (!src) { if (!$('watchStatus').classList.contains('error')) $('watchStatus').textContent = ''; return; }
+  const ago = src.at ? Math.max(0, Math.round((Date.now() - src.at) / 1000)) : 0;
+  $('watchStatus').className = 'note' + (['notFound', 'offline', 'unavailable'].includes(src.status) ? ' error' : '');
+  $('watchStatus').textContent = tr('watch.status.' + src.status, { code: src.code, seconds: ago });
+}
+
+async function shareRequest(action) {
+  $('shareStatus').className = 'note';
+  $('shareStatus').textContent = tr('share.connecting');
+  try { renderShare(await post('api/share', { action })); } catch (e) {
+    $('shareStatus').className = 'note error';
+    $('shareStatus').textContent = e.message;
+    $('shareOn').checked = action === 'stop';
+  }
+}
+
+async function setWatchCode(text) {
+  const code = String(text || '').toUpperCase().replace(/[\s-]/g, '');
+  config.options.watchCode = code;
+  await save();
+  $('watchCode').dataset.dirty = '';
+  // El servidor no guarda un código mal escrito: se queda el anterior.
+  if (config.options.watchCode !== code) {
+    $('watchStatus').className = 'note error';
+    $('watchStatus').textContent = tr('watch.invalid');
+    $('watchCode').value = code;
+    return;
+  }
+  $('watchStatus').className = 'note';
+  $('watchStatus').textContent = code ? tr('watch.status.connecting', { code }) : '';
+  refreshStatus();
+}
+
+function initRemote(share) {
+  renderShare(share);
+  $('shareOn').addEventListener('change', () => shareRequest($('shareOn').checked ? 'start' : 'stop'));
+  $('shareRenew').addEventListener('click', () => shareRequest('renew'));
+  $('shareCopy').addEventListener('click', async () => {
+    await navigator.clipboard.writeText($('shareCode').textContent);
+    $('shareCopy').textContent = tr('share.copied');
+    setTimeout(() => { $('shareCopy').textContent = tr('share.copy'); }, 1500);
+  });
+  $('watchCode').value = config.options.watchCode;
+  $('watchCode').addEventListener('input', () => { $('watchCode').dataset.dirty = '1'; });
+  $('watchCode').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); setWatchCode($('watchCode').value); } });
+  $('watchStart').addEventListener('click', () => setWatchCode($('watchCode').value));
+  $('watchStop').addEventListener('click', () => { $('watchCode').value = ''; setWatchCode(''); });
+  renderWatch(null);
+}
+
+// ---------- Vista de carrera ----------
+const RACE_SLOTS = 4;
+let race = null;
+// Enlace de la vista de carrera para OBS: el mismo sitio que el de la vista normal.
+const raceLink = () => obsUrl.replace(/overlay\.html.*$/, 'race.html');
+
+async function copyButton(button, text, key) {
+  await navigator.clipboard.writeText(text);
+  button.textContent = tr('panel.linkCopied');
+  setTimeout(() => { button.textContent = tr(key); }, 1500);
+}
+
+function fillRaceProfile() {
+  const select = $('raceProfile');
+  if (!race || !select) return;
+  select.replaceChildren(...config.profileList.map(p => new Option(profileName(p), p.id)));
+  select.value = race.profile;
+}
+
+function showRace() {
+  for (let i = 0; i < RACE_SLOTS; i++) {
+    const name = $('raceName' + i), code = $('raceCode' + i);
+    if (name !== document.activeElement) name.value = race.slots[i].name;
+    if (code !== document.activeElement) { code.value = race.slots[i].code; code.classList.remove('bad'); }
+  }
+  $('raceLayout').value = race.layout;
+  $('raceDelay').value = race.delay;
+  $('raceDelay').parentElement.querySelector('output').value = race.delay;
+  fillRaceProfile();
+}
+
+// Guarda la carrera tal como está en el panel. Un código mal escrito no se guarda: se marca en rojo.
+async function saveRace() {
+  const typed = [];
+  const body = {
+    slots: Array.from({ length: RACE_SLOTS }, (_, i) => {
+      typed[i] = $('raceCode' + i).value.toUpperCase().replace(/[\s-]/g, '');
+      return { name: $('raceName' + i).value, code: typed[i] };
+    }),
+    layout: $('raceLayout').value, delay: Number($('raceDelay').value), profile: $('raceProfile').value,
+  };
+  try { race = await post('api/race', body); } catch (e) { $('raceStatus').className = 'note error'; $('raceStatus').textContent = e.message; return; }
+  showRace();
+  const bad = typed.map((c, i) => (c && race.slots[i].code !== c ? i : -1)).filter(i => i >= 0);
+  for (const i of bad) { $('raceCode' + i).value = typed[i]; $('raceCode' + i).classList.add('bad'); }
+  $('raceStatus').className = 'note' + (bad.length ? ' error' : '');
+  $('raceStatus').textContent = bad.length ? tr('watch.invalid') : '';
+  if (!bad.length) renderRaceStatus();
+}
+
+// Estado de cada hueco con código: conectado, sin partida aún, código inexistente...
+async function renderRaceStatus() {
+  if (!race || $('raceStatus').classList.contains('error')) return;
+  const filled = race.slots.map((s, i) => [s, i + 1]).filter(([s]) => s.code);
+  if (!filled.length) { $('raceStatus').textContent = ''; return; }
+  const lines = await Promise.all(filled.map(async ([s, n]) => {
+    try {
+      const src = (await fetch('api/state?race=' + n).then(r => r.json())).sources.remote;
+      const ago = src.at ? Math.max(0, Math.round((Date.now() - src.at) / 1000)) : 0;
+      return `${n}. ${tr('watch.status.' + src.status, { code: s.code, seconds: ago })}`;
+    } catch { return `${n}. ${tr('watch.status.offline', { code: s.code, seconds: 0 })}`; }
+  }));
+  if (!$('raceStatus').classList.contains('error')) $('raceStatus').textContent = lines.join(' ');
+}
+
+async function initRace() {
+  const box = $('raceSlots');
+  for (let i = 0; i < RACE_SLOTS; i++) {
+    const name = document.createElement('input'), code = document.createElement('input');
+    name.id = 'raceName' + i; name.maxLength = 40; name.spellcheck = false; name.placeholder = tr('race.name');
+    name.setAttribute('aria-label', tr('race.name') + ' ' + (i + 1));
+    code.id = 'raceCode' + i; code.maxLength = 12; code.spellcheck = false; code.autocomplete = 'off'; code.className = 'race-code';
+    code.placeholder = tr('watch.placeholder'); code.setAttribute('aria-label', tr('watch.placeholder') + ' ' + (i + 1));
+    for (const input of [name, code]) {
+      input.addEventListener('change', saveRace);
+      input.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); input.blur(); } });
+    }
+    box.append(Object.assign(document.createElement('b'), { textContent: i + 1 }), name, code);
+  }
+  for (const id of ['raceLayout', 'raceProfile', 'raceDelay']) $(id).addEventListener('change', saveRace);
+  $('raceDelay').addEventListener('input', () => { $('raceDelay').parentElement.querySelector('output').value = $('raceDelay').value; });
+  $('raceOpen').addEventListener('click', () => window.open(new URL('race.html', location.href).href, 'isaac-race', 'popup,width=900,height=484'));
+  try { race = await fetch('api/race').then(r => r.json()); showRace(); renderRaceStatus(); } catch { /* se verá al recargar */ }
+}
+
+// ---------- Pestañas ----------
+// La pestaña abierta se recuerda en este navegador; si no se puede, se empieza en «General».
+const TAB_KEY = 'multitracker.tab';
+function showTab(id) {
+  $('form').dataset.tab = id;
+  for (const b of document.querySelectorAll('[data-tab-button]')) b.setAttribute('aria-selected', String(b.dataset.tabButton === id));
+  try { localStorage.setItem(TAB_KEY, id); } catch { /* sin almacenamiento: no se recuerda */ }
+}
+function initTabs() {
+  for (const b of document.querySelectorAll('[data-tab-button]')) b.addEventListener('click', () => showTab(b.dataset.tabButton));
+  let saved = null;
+  try { saved = localStorage.getItem(TAB_KEY); } catch { /* sin almacenamiento */ }
+  showTab(saved === 'multi' ? 'multi' : 'general');
+}
+
 function initLanguage(languages) {
   const select = $('language');
   for (const [id, name] of Object.entries(languages)) select.add(new Option(name, id));
   select.value = lang;
+  // Idioma de la vista de este perfil: el del panel u otro cualquiera.
+  const view = $('viewLanguage');
+  view.add(new Option(tr('run.viewLangPanel'), 'panel'));
+  for (const [id, name] of Object.entries(languages)) view.add(new Option(name, id));
   select.addEventListener('change', async () => {
     config.language = select.value;
     await save();
@@ -652,9 +832,13 @@ async function refreshStatus() {
     syncPreviewSize();
     syncIconControls();
   }
+  renderShare(s.share);
+  renderWatch(s.sources.remote);
+  renderRaceStatus();
   const logErr = s.sources.log.error, src = s.sources.save;
   $('logStatus').className = 'note' + (logErr ? ' error' : '');
-  $('logStatus').textContent = logErr ? tr('run.logError', { error: logErr })
+  $('logStatus').textContent = s.sources.remote ? tr('watch.instead', { code: s.sources.remote.code })
+    : logErr ? tr('run.logError', { error: logErr })
     : s.run ? tr('run.following', { seed: s.run.seed, slot: s.run.slot })
     : s.sources.log.missing ? tr('run.noLog') : tr('run.none');
   const error = saveFileError || src.error;
@@ -744,6 +928,10 @@ async function init() {
     for (const k of keys) checkbox(parent, tr(prefix + k), { show: k }, on => { config.show[k] = on; hideToast(); save(); });
   };
   group($('showRun'), RUN_SHOW, 'run.');
+  group($('showCoop'), ['players'], 'run.');
+  initTabs();
+  initRemote(state.share);
+  initRace();
   group($('showProgress'), PROGRESS_SHOW, 'progress.');
   const pick = (list, entries) => {
     for (const x of entries) checkbox($(list), x.name, { list, id: x.id }, on => { toggleInList(config[list], x.id, on); hideToast(); updateListCounts(); save(); });
@@ -766,6 +954,8 @@ async function init() {
 
   $('testHighlight').addEventListener('click', () => $('preview').contentWindow.testHighlight());
   $('link').textContent = obsLink();
+  $('watchLink').addEventListener('click', () => copyButton($('watchLink'), withProfile(obsUrl, PROFILE), 'watch.copyLink'));
+  $('raceCopy').addEventListener('click', () => copyButton($('raceCopy'), raceLink(), 'race.copyLink'));
   $('copyLink').addEventListener('click', async () => {
     await navigator.clipboard.writeText(obsLink());
     $('copyLink').textContent = tr('panel.linkCopied');

@@ -12,6 +12,7 @@ const { COSTUMES, OWNER_SPRITES } = require('./lib/resources.js');
 const { SaveError, parseSave, summarize, listSaves, COUNTER_GOALS, WATCHED_ACHIEVEMENTS } = require('./lib/save.js');
 const { loadGameData, floorLabel, TRANSFORMS, TRANSFORM_GOAL } = require('./lib/gamedata.js');
 const { LANGUAGES, resolve: resolveLanguage, t } = require('./app/i18n.js');
+const { Remote, normalizeCode, isCode, DEFAULT_RELAY } = require('./lib/remote.js');
 
 const LOG_POLL_MS = 1000;
 // El contador de frames de la partida avanza 30 veces por segundo.
@@ -28,6 +29,9 @@ const APPEARANCE = {
   whoOutline: 'outline', whoOutlineColor: '#000000', whoOutlineSize: 2,
   textColor: '#f0e4d8', accentColor: '#f0ad4e', doneColor: '#8fd18f',
   blindColor: '#c77dff',
+  // Tamaño del texto de la partida actual, en % del tamaño del texto: así todo sigue a «Tamaño» y se mantienen las
+  // proporciones. Con una fuente pixelada, overlay.js lo ajusta al tamaño nítido más cercano.
+  runCharScale: 100, runInfoScale: 100, runTransformsScale: 100, runDescScale: 100,
   iconGap: 2, iconEffect: 'none',
   // Cabeza de quien lleva el objeto (Jacob y Esaú, Tainted Lazarus): sobre un círculo de su color o sola, su tamaño
   // respecto al icono y la esquina donde va (bl, br, tl, tr: abajo/arriba e izquierda/derecha).
@@ -48,7 +52,7 @@ const DEFAULTS = {
   windowProfile: 'main', obsProfile: 'main',
   // Temas guardados por el usuario: [{ id, name, options }], comunes a todos los perfiles.
   themes: [],
-  show: { character: true, seed: true, floor: true, runTime: false, items: true, description: false, transforms: true, playtime: false, achievements: true, collection: true, winStreak: true, marksHard: false, marksAny: false, challenges: false },
+  show: { character: true, players: true, seed: true, floor: true, runTime: false, items: true, description: false, transforms: true, playtime: false, achievements: true, collection: true, winStreak: true, marksHard: false, marksAny: false, challenges: false },
   goals: [],
   watched: [],
   options: {
@@ -69,6 +73,15 @@ const DEFAULTS = {
     viewWidth: 900, viewHeight: 121,
     // Maldición del ciego: 'floor' solo en el separador del piso, 'items' también en cada objeto, 'none' sin marca.
     blindMark: 'floor',
+    // Idioma de la vista ('panel': el del panel) y nombres del juego (objetos, transformaciones, logros) traducidos a
+    // ese idioma o con su nombre original en inglés. Va en cada perfil: OBS puede mostrarse en otro idioma que la ventana.
+    viewLanguage: 'panel', gameNames: 'translated',
+    // Partidas online: los objetos de todos con la insignia de quién lo tomó ('all'), solo los propios ('mine') o una
+    // fila por jugador ('rows'); y si se destaca y describe solo lo que toma uno mismo ('mine') o lo de todos ('all').
+    coopItems: 'all', coopHighlight: 'mine',
+    // Ver la partida de otra persona en esta vista: su código ('' = la propia) y cuántos segundos de retraso, para ir a
+    // la par con su directo.
+    watchCode: '', watchDelay: 10,
     // Imagen de fondo propia, aparte de los temas. bgImage: "<extensión>:<marca de tiempo>" o '' sin imagen; solo la cambia /api/background.
     bgImage: '', bgImageOpacity: 100, bgImageFit: 'cover', bgImageScale: 100, bgImageX: 50, bgImageY: 50,
   },
@@ -76,6 +89,8 @@ const DEFAULTS = {
 const LIMITS = {
   iconSize: [16, 96], rows: [0, 8], maxItems: [0, 200], highlightSeconds: [2, 20], fontSize: [10, 32], iconGap: [0, 16], rowGap: [0, 24], padding: [0, 32], radius: [0, 24], backgroundOpacity: [0, 100],
   viewWidth: [200, 3840], viewHeight: [60, 2160], whoOutlineSize: [1, 4], bgImageOpacity: [0, 100], bgImageScale: [10, 400], bgImageX: [-100, 200], bgImageY: [-100, 200],
+  watchDelay: [0, 120],
+  runCharScale: [50, 250], runInfoScale: [50, 250], runTransformsScale: [50, 250], runDescScale: [50, 250],
   sideWidth: [120, 400], pageMinIcon: [16, 96], pageSeconds: [3, 20], pageAnimMs: [100, 2000], marqueeSpeed: [10, 300], progressSwapSeconds: [3, 60], progressFadeMs: [100, 3000],
 };
 const CHOICES = {
@@ -84,6 +99,8 @@ const CHOICES = {
   bgImageFit: ['cover', 'contain', 'stretch', 'tile', 'scale'], blindMark: ['floor', 'items', 'none'],
   whoOutline: ['none', 'outline', 'glow'],
   ownerBadgeSize: ['small', 'medium', 'large'], ownerBadgeCorner: ['bl', 'br', 'tl', 'tr'],
+  viewLanguage: ['panel', ...Object.keys(LANGUAGES)], gameNames: ['translated', 'original'],
+  coopItems: ['all', 'mine', 'rows'], coopHighlight: ['mine', 'all'],
   highlightStyle: ['full', 'toast', 'fly', 'spotlight', 'ticker', 'pulse'],
   overflow: ['pages', 'marquee', 'shrink'], pageEffect: ['slide', 'fade', 'none'], pageDirection: ['ltr', 'rtl'],
 };
@@ -107,6 +124,9 @@ const MAIN = 'main';
 const PROFILE_ID = /^p[0-9a-z]{1,20}$/;
 const THEME_ID = /^t[0-9a-z]{1,20}$/;
 const MAX_PROFILES = 10;
+// Vista de carrera: cuántas partidas a la vez y cómo se reparten (una franja debajo de otra, o en cuadrícula de 2×2).
+const RACE_SLOTS = 4;
+const RACE_LAYOUTS = ['rows', 'grid'];
 const MAX_THEMES = 30;
 const NAME_MAX = 40;
 // Comunes a todos los perfiles: la ventana del tracker es una sola y la imagen de fondo, un solo archivo.
@@ -125,6 +145,10 @@ function sanitizeOptions(o, out) {
   for (const k of FLAGS) if (typeof o[k] === 'boolean') out[k] = o[k];
   for (const k of COLORS) if (/^#[0-9a-f]{6}$/i.test(o[k] || '')) out[k] = o[k];
   if (FONT_NAME.test(o.font || '')) out.font = o.font.trim();
+  if (typeof o.watchCode === 'string') {
+    const code = normalizeCode(o.watchCode);
+    if (!code || isCode(code)) out.watchCode = code;
+  }
   return out;
 }
 // Un tema solo guarda la apariencia (las claves de APPEARANCE), partiendo de la apariencia por defecto.
@@ -174,9 +198,16 @@ function createTracker({ resDir, gameDir, steamUserdata, dataDir }, options = {}
     for (const k of GLOBAL_OPTIONS) config.options[k] = { ...DEFAULTS.options, ...c.options }[k];
     for (const k of ['windowProfile', 'obsProfile']) config[k] = profileId(c, config[k]);
     delete config.profiles;
+    // La clave para compartir no sale de aquí: con ella cualquiera podría subir partidas con ese código.
+    delete config.share;
     return config;
   }
   const languageOf = config => resolveLanguage(config.language);
+  // Idiomas de una vista: el de sus textos y el de los nombres del juego ('en' con los nombres originales).
+  function viewLanguages(config) {
+    const o = config.options, view = o.viewLanguage && o.viewLanguage !== 'panel' ? resolveLanguage(o.viewLanguage) : languageOf(config);
+    return { view, names: o.gameNames === 'original' ? 'en' : view };
+  }
   const T = (key, vars) => t(languageOf(loadConfig()), key, vars);
   // Mensaje de un error en el idioma actual: los propios llevan una clave; los del sistema se muestran tal cual.
   const describeError = (e, lang) => {
@@ -263,6 +294,12 @@ function createTracker({ resDir, gameDir, steamUserdata, dataDir }, options = {}
   let logLive = false;
   const onLogEvent = (type, d) => { if (logLive) for (const x of extensions) if (x.onLogEvent) x.onLogEvent(type, d); };
   const runLog = new RunLog(path.join(gameDir, 'log.txt'), readJson(RUNS_FILE, {}), id => gameData().actives.has(id), id => gameData().quests.has(id), recordFrames, onLogEvent);
+  // Id de Steam de 64 bits de la cuenta abierta: el nombre de quien juega en este PC en las partidas online.
+  let localUser;
+  runLog.localUser = () => {
+    if (localUser === undefined) { const a = activeSteamAccount(); localUser = a ? String(BigInt(a) + 76561197960265728n) : null; }
+    return localUser;
+  };
   // missing: el juego aún no ha creado log.txt (por ejemplo, antes de abrirlo por primera vez). No es un fallo.
   const logStatus = { ok: false, missing: false, error: null };
   function pollLog() {
@@ -318,37 +355,135 @@ function createTracker({ resDir, gameDir, steamUserdata, dataDir }, options = {}
   const currentSave = () => { try { return selectedSave(loadConfig()); } catch { return null; } };
   for (const create of options.extensions || []) extensions.push(create({ dataDir, gameData, selectedSave: currentSave, currentRun: () => runLog.run }));
 
-  function runView(lang) {
-    const r = runLog.run;
+  // r: la partida del log o la de otra persona, tal como la sube su MultiTracker (shareRun()).
+  function runView(lang, namesLang, r = runLog.run) {
     if (!r) return null;
     const { info, itemName, characterName, transformName, describe } = gameData();
     const items = r.items.filter(i => !(info[i.id] && info[i.id].shown === false)).map(i => {
       const f = r.floors[i.floor];
-      return { id: i.id, name: itemName(i.id, lang, i.name), blind: i.blind, removed: i.removed, floor: i.floor, floorLabel: f ? floorLabel(f) : '', desc: describe(i.id, lang), owner: i.owner, soul: !!i.soul, granted: !!i.granted };
+      return { id: i.id, name: itemName(i.id, namesLang, i.name), blind: i.blind, removed: i.removed, floor: i.floor, floorLabel: f ? floorLabel(f) : '', desc: describe(i.id, lang), owner: i.owner, soul: !!i.soul, granted: !!i.granted, player: i.player || 0 };
     });
+    // Partida online con más de un jugador: quién es cada uno. Las transformaciones son de cada personaje: solo cuentan
+    // los objetos de quien juega en este PC.
+    const players = r.players && r.players.length > 1
+      ? r.players.map((p, index) => ({ index, local: !!p.local, name: p.name || '', character: characterName(p.character) })) : null;
+    const me = players ? Math.max(0, players.findIndex(p => p.local)) : null;
     const seen = {};
     for (const i of r.items) {
+      if (me !== null && (i.player || 0) !== me) continue;
       const it = info[i.id];
       // Lo de Esau (Alma de Jacob y Esaú) y del Keeper de Strawman cuenta para ellos, no para el personaje.
       if (it && !i.soul && !i.helper) for (const k of Object.keys(TRANSFORMS)) if (it[k]) (seen[k] = seen[k] || new Set()).add(i.id);
     }
     const floor = r.floors[r.floors.length - 1];
     return {
-      seed: r.seed, slot: r.slot, seconds: Math.round((r.frames || 0) / GAME_FPS),
+      seed: r.seed, slot: r.slot, players, me, seconds: Math.round((r.frames || 0) / GAME_FPS),
       character: characterName(r.character),
       floor: floor ? floorLabel(floor) : '',
       items,
-      transforms: Object.keys(seen).map(k => ({ id: k, name: transformName(k, lang), count: seen[k].size, goal: TRANSFORM_GOAL })),
+      transforms: Object.keys(seen).map(k => ({ id: k, name: transformName(k, namesLang), count: seen[k].size, goal: TRANSFORM_GOAL })),
     };
   }
 
-  function state(profile) {
-    const config = loadConfig(profile);
+  // ---------- Ver la partida de otra persona y compartir la propia ----------
+  const remote = new Remote({ relayUrl: options.relayUrl || process.env.MULTITRACKER_RELAY || DEFAULT_RELAY });
+  // Lo que se comparte de la partida: lo mismo que guarda el log, sin los ids de Steam de una partida online.
+  const shareRun = r => r && {
+    seed: r.seed, slot: r.slot, mode: r.mode, character: r.character, floors: r.floors, items: r.items,
+    players: r.players && r.players.map(({ local, character, name }) => ({ local, character, name })),
+    frames: r.frames, rewound: r.rewound, deadForm: r.deadForm, strawman: r.strawman,
+  };
+  const storedShare = () => { const s = readStored().share; return s && typeof s === 'object' ? s : {}; };
+  const activeShare = () => { const s = storedShare(); return s.enabled && isCode(s.code || '') && s.key ? s : null; };
+  function saveShare(share) {
+    writeFile(CONFIG_FILE, JSON.stringify({ ...readStored(), share }, null, 2));
+  }
+  // start: empieza a compartir (con el código de antes, si lo hay); stop: deja de hacerlo; renew: código nuevo, y el
+  // anterior deja de funcionar.
+  async function shareAction(b) {
+    const old = storedShare();
+    if (b.action === 'stop') { saveShare({ ...old, enabled: false }); return shareInfo(); }
+    if (b.action !== 'start' && b.action !== 'renew') throw new UserError('err.badAction');
+    if (!remote.available) throw new UserError('err.shareUnavailable');
+    let share = old;
+    if (b.action === 'renew' || !isCode(old.code || '') || !old.key) {
+      if (b.action === 'renew') remote.deleteShare(old);
+      try { share = await remote.createShare(); } catch { throw new UserError('err.shareFailed'); }
+    }
+    saveShare({ code: share.code, key: share.key, enabled: true });
+    publishTick();
+    return shareInfo();
+  }
+  function shareInfo() {
+    const s = storedShare();
+    return { available: remote.available, enabled: !!activeShare(), code: isCode(s.code || '') ? s.code : '', ...remote.shareStatus() };
+  }
+  // Cada segundo se ofrece la partida; remote decide cuándo subirla. Los objetos, pisos y jugadores van enseguida.
+  function publishTick() {
+    const share = activeShare();
+    if (!share) { remote.offer(null); return; }
+    const config = loadConfig(), save = readProgress(config, languageOf(config)), r = runLog.run;
+    const timeId = timeIdOf(save.id, save.file);
+    const payload = { format: 1, run: shareRun(r), progress: save.progress, playtime: timeId ? secondsOf(timeId) : null };
+    const fastKey = r ? JSON.stringify([r.seed, r.character, r.floors, r.items, r.players]) : '';
+    remote.offer(share, payload, fastKey);
+  }
+  setInterval(() => { try { publishTick(); } catch { /* se reintenta en el siguiente */ } }, 1000).unref();
+
+  // ---------- Vista de carrera ----------
+  // Hasta RACE_SLOTS partidas de otras personas en una sola vista (app/race.html), cada una en su franja con el aspecto
+  // de un perfil. Común a todo el programa: es una sola vista.
+  function raceConfig(stored = readStored()) {
+    const r = stored.race && typeof stored.race === 'object' ? stored.race : {};
+    const slots = Array.from({ length: RACE_SLOTS }, (_, i) => {
+      const s = (Array.isArray(r.slots) && r.slots[i]) || {};
+      const code = normalizeCode(s.code);
+      return { code: isCode(code) ? code : '', name: cleanName(s.name) };
+    });
+    return {
+      slots, layout: RACE_LAYOUTS.includes(r.layout) ? r.layout : RACE_LAYOUTS[0],
+      delay: Number.isFinite(r.delay) ? Math.min(LIMITS.watchDelay[1], Math.max(LIMITS.watchDelay[0], Math.round(r.delay))) : DEFAULTS.options.watchDelay,
+      profile: profileId(stored, r.profile),
+    };
+  }
+  function saveRace(b) {
+    const stored = readStored();
+    const race = raceConfig({ ...stored, race: b });
+    writeFile(CONFIG_FILE, JSON.stringify({ ...stored, race }, null, 2));
+    return race;
+  }
+
+  // race: franja de la vista de carrera (1 a RACE_SLOTS), con el aspecto del perfil de la carrera.
+  function state(profile, race = 0) {
+    let config = loadConfig(profile), runner = null;
+    if (race) {
+      const rc = raceConfig(), slot = rc.slots[race - 1] || { code: '', name: '' };
+      config = loadConfig(rc.profile);
+      config.options = { ...config.options, watchCode: slot.code, watchDelay: rc.delay };
+      runner = slot.name || slot.code;
+    }
     const lang = languageOf(config);
+    const langs = viewLanguages(config);
+    const watch = config.options.watchCode;
+    if (watch || race) {
+      // Esta vista muestra la partida de otra persona: su partida, su progreso y su tiempo, con el retraso elegido.
+      // Una franja de carrera sin código no muestra nada (nunca la partida propia).
+      const seen = watch ? remote.view(watch, config.options.watchDelay) : { status: 'empty', data: null, at: null };
+      const d = seen.data || {};
+      return {
+        runner,
+        lang, viewLang: langs.view, namesLang: langs.names, desktop: !!options.desktop, version: options.version || null, edition: options.edition || null,
+        update: options.update ? options.update.status() : null, obs: options.obsStatus ? options.obsStatus() : null,
+        config, run: d.run ? runView(langs.view, langs.names, d.run) : null, progress: d.progress || null,
+        playtime: Number.isFinite(d.playtime) ? d.playtime : null, share: shareInfo(),
+        sources: { log: logStatus, save: { id: null, file: null, mtime: null, error: null }, remote: { code: watch, status: seen.status, at: seen.at } },
+      };
+    }
     const save = readProgress(config, lang);
     return {
-      lang, desktop: !!options.desktop, version: options.version || null, edition: options.edition || null, update: options.update ? options.update.status() : null, obs: options.obsStatus ? options.obsStatus() : null,
-      config, run: runView(lang), progress: save.progress,
+      // lang: el del panel; viewLang y namesLang: los de la vista de este perfil.
+      lang, viewLang: langs.view, namesLang: langs.names, share: shareInfo(), desktop: !!options.desktop, version: options.version || null, edition: options.edition || null, update: options.update ? options.update.status() : null, obs: options.obsStatus ? options.obsStatus() : null,
+      config, run: runView(langs.view, langs.names), progress: save.progress,
       // Segundos jugados en el archivo elegido desde que se registra; null si no es un guardado conocido.
       playtime: timeIdOf(save.id, save.file) ? secondsOf(timeIdOf(save.id, save.file)) : null,
       sources: { log: logStatus, save: { id: save.id, file: save.file, mtime: save.mtime, error: save.error } },
@@ -370,6 +505,16 @@ function createTracker({ resDir, gameDir, steamUserdata, dataDir }, options = {}
       appearance: APPEARANCE,
       // Para el botón «Restablecer» de cada sección del panel.
       defaults: { show: DEFAULTS.show, goals: DEFAULTS.goals, watched: DEFAULTS.watched, options: DEFAULTS.options },
+    };
+  }
+
+  // Nombres de contadores y logros vigilados en los idiomas de la vista de un perfil.
+  function viewNames(profile) {
+    const { view, names } = viewLanguages(loadConfig(profile));
+    const { achievementName } = gameData();
+    return {
+      goals: COUNTER_GOALS.map(g => ({ id: g.id, name: t(view, 'goal.' + g.id) })),
+      watched: WATCHED_ACHIEVEMENTS.map(id => ({ id: 's' + id, name: achievementName(id, names) })),
     };
   }
 
@@ -495,11 +640,17 @@ function createTracker({ resDir, gameDir, steamUserdata, dataDir }, options = {}
     '/api/background': (body, profile) => setBackground(body, profile),
     '/api/profiles': body => profileAction(body),
     '/api/themes': body => themeAction(body),
+    '/api/share': body => shareAction(body),
+    '/api/race': body => saveRace(body),
   };
   async function respond({ method, pathname, contentType, readJsonBody, query = new URLSearchParams() }) {
-    const profile = query.get('profile');
-    if (method === 'GET' && pathname === '/api/state') return json(200, state(profile));
+    // Una franja de la vista de carrera usa el perfil elegido para la carrera.
+    const race = Math.min(RACE_SLOTS, Math.max(0, Math.floor(+query.get('race') || 0)));
+    const profile = race ? raceConfig().profile : query.get('profile');
+    if (method === 'GET' && pathname === '/api/state') return json(200, state(profile, race));
+    if (method === 'GET' && pathname === '/api/race') return json(200, raceConfig());
     if (method === 'GET' && pathname === '/api/choices') return json(200, choices());
+    if (method === 'GET' && pathname === '/api/names') return json(200, viewNames(profile));
     if (method === 'GET' && pathname === '/api/fonts') return json(200, { fonts: await listFonts() });
     // Exigir JSON impide que una página web cualquiera lance estas acciones contra el servidor local.
     if (method === 'POST' && !String(contentType).startsWith('application/json')) return json(415, { error: 'Expected JSON' });
@@ -510,7 +661,7 @@ function createTracker({ resDir, gameDir, steamUserdata, dataDir }, options = {}
     if (method === 'POST' && Object.hasOwn(POST_ACTIONS, pathname)) {
       try {
         const body = await readJsonBody();
-        return json(200, POST_ACTIONS[pathname](body && typeof body === 'object' ? body : {}, profile));
+        return json(200, await POST_ACTIONS[pathname](body && typeof body === 'object' ? body : {}, profile));
       } catch (e) {
         if (e instanceof UserError) return json(400, { error: T(e.key, e.vars) });
         throw e;

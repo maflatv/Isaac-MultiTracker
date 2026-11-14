@@ -1,0 +1,7 @@
+/* Vista de carrera: cada franja es la vista normal (overlay.html?race=N) en su propio recuadro. Fondo transparente
+   para OBS: el fondo de cada franja es el de su perfil. */
+html, body { margin: 0; height: 100%; overflow: hidden; background: transparent; }
+#race { display: grid; height: 100vh; gap: 4px; }
+#race.rows { grid-auto-rows: 1fr; }
+#race.grid { grid-template-columns: 1fr 1fr; grid-auto-rows: 1fr; }
+#race iframe { display: block; width: 100%; height: 100%; border: 0; background: transparent; }

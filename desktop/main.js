@@ -20,6 +20,8 @@ const OBS_PORT = Number(process.env.PORT) || DEFAULT_PORT;
 // Tamaño del área útil de la vista: el mismo banner que la ventana de Rebirth Item Tracker.
 const VIEW_SIZE = { width: 900, height: 121 };
 const PANEL_SIZE = { width: 1280, height: 860 };
+// Vista de carrera: cuatro franjas con el alto de la ventana del tracker.
+const RACE_SIZE = { width: 900, height: 484 };
 const DARK = '#1d1714';
 
 protocol.registerSchemesAsPrivileged([{ scheme: SCHEME, privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true } }]);
@@ -37,6 +39,7 @@ const language = () => (tracker ? tracker.language() : resolve(readJson(path.joi
 function guard(win) {
   win.webContents.setWindowOpenHandler(({ url }) => {
     if (url.startsWith(ORIGIN) && new URL(url).pathname === '/overlay.html') openView();
+    else if (url.startsWith(ORIGIN) && new URL(url).pathname === '/race.html') openRace();
     else if (/^https:\/\//.test(url)) shell.openExternal(url);
     return { action: 'deny' };
   });
@@ -112,6 +115,16 @@ function openView() {
   });
   view.on('closed', () => { view = null; viewProfile = null; clearTimeout(resizing); });
   loadViewProfile();
+}
+
+// Vista de carrera: hasta 4 partidas de otras personas en una ventana. Recuerda su sitio y su tamaño.
+let race = null;
+function openRace() {
+  if (race) { if (race.isMinimized()) race.restore(); race.focus(); return; }
+  race = createWindow({ ...savedBounds('race', RACE_SIZE), minWidth: 200, minHeight: 120 }, `${APP_NAME} · ${t(language(), 'race.title')}`);
+  race.on('close', () => saveBounds('race', race.getBounds()));
+  race.on('closed', () => { race = null; });
+  race.loadURL(`${ORIGIN}/race.html`);
 }
 
 // La ventana del tracker usa el perfil elegido en el panel; si se cambia con la ventana abierta, se recarga con él.

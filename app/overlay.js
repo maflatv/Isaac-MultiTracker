@@ -45,6 +45,19 @@ function ownerBadge(owner) {
   }
   return b;
 }
+// Partidas online: cada jugador con su color (por su número) y la inicial de su nombre de Steam.
+const PLAYER_COLORS = ['#5aa9ff', '#ff6b6b', '#5fd36a', '#ffd34d'];
+const runPlayer = (run, i) => (run && run.players ? run.players[i.player] || null : null);
+const playerName = p => p.name || (p.local ? tr('view.you') : tr('view.player', { n: p.index + 1 }));
+function playerBadge(p) {
+  const b = el('span', 'player-badge', (Array.from(p.name || '')[0] || String(p.index + 1)).toUpperCase());
+  b.style.background = PLAYER_COLORS[p.index % PLAYER_COLORS.length];
+  return b;
+}
+// En una partida online, si solo cuenta lo que toma quien juega en este PC (para destacar, describir y marcar).
+const onlyMine = s => !!(s.run && s.run.players) && (s.config.options.coopHighlight === 'mine' || s.config.options.coopItems === 'mine');
+const mineFilter = s => (onlyMine(s) ? i => i.player === s.run.me : () => true);
+
 const LABEL_ROOM = 6; // separación mínima entre el código de un piso y el del siguiente
 const FIT_ICON_SIZES = [32, 28, 24];
 // Solo si con 24 px y superpuestos no caben todos los objetos.
@@ -53,13 +66,18 @@ const TINY_ICON_SIZES = [20, 16];
 const BANNER_ICON_SIZES = [96, 80, 64, 56, 48, 40, ...FIT_ICON_SIZES];
 
 // Perfil de esta vista (?profile= en la dirección): la ventana del tracker, la fuente de OBS o la vista previa del panel.
-const PROFILE = new URLSearchParams(location.search).get('profile');
-const STATE_URL = 'api/state' + (PROFILE ? '?profile=' + encodeURIComponent(PROFILE) : '');
+// En la vista de carrera (app/race.html), cada franja es esta misma página con ?race=1 a 4.
+const PARAMS = new URLSearchParams(location.search);
+const PROFILE = PARAMS.get('profile');
+const RACE = PARAMS.get('race');
+const QUERY = RACE ? '?race=' + encodeURIComponent(RACE) : PROFILE ? '?profile=' + encodeURIComponent(PROFILE) : '';
+const STATE_URL = 'api/state' + QUERY;
 const view = document.getElementById('view');
 const hero = document.getElementById('hero');
 let names = { goals: {}, watched: {} };
+// Idioma de los textos de esta vista; namesKey, el de los nombres de contadores y logros ya cargados.
 let lang = 'en';
-let namesLang = null;
+let namesKey = null;
 const tr = (key, vars) => I18N.t(lang, key, vars);
 let lastState = '';
 let current = null;
@@ -119,11 +137,13 @@ function playtimeTag(seconds) {
 
 function whoBlock(s) {
   const w = el('div', 'who'), { show } = s.config, r = s.run;
-  if (r && show.character && r.character) w.append(el('strong', '', r.character));
-  if (r && show.floor && r.floor) w.append(el('span', '', r.floor));
+  // Vista de carrera: el nombre de quien juega en esta franja.
+  if (s.runner) w.append(el('b', 'runner', s.runner));
+  if (r && show.character && r.character) w.append(el('strong', 'run-char', r.character));
+  if (r && show.floor && r.floor) w.append(el('span', 'run-info', r.floor));
   // Se actualiza con cada cambio de sala, que es cuando el juego escribe el contador en el log.
-  if (r && show.runTime && r.seconds) { const t = el('span', '', I18N.duration(lang, r.seconds)); t.title = tr('run.runTime'); w.append(t); }
-  if (r && show.seed) w.append(el('code', '', r.seed));
+  if (r && show.runTime && r.seconds) { const t = el('span', 'run-info', I18N.duration(lang, r.seconds)); t.title = tr('run.runTime'); w.append(t); }
+  if (r && show.seed) w.append(el('code', 'run-seed', r.seed));
   if (show.winStreak && s.progress) w.append(streakTag(s.progress));
   if (show.playtime && s.playtime !== null && s.playtime !== undefined) w.append(playtimeTag(s.playtime));
   return w;
@@ -223,13 +243,26 @@ function transformBlock(s) {
     if (hideDone && done) continue;
     if (transformsClose && t.count < t.goal - 1) continue;
     row.append(pips(t.name, t.count, t.goal));
+    row.lastChild.classList.add('run-tf');
+  }
+  return row;
+}
+
+// Partida online: cada jugador con su insignia, su nombre de Steam y su personaje.
+function playersBlock(s) {
+  const row = el('div', 'tags');
+  if (!s.config.show.players || !s.run || !s.run.players) return row;
+  for (const p of s.run.players) {
+    const t = el('span', 'tag player-tag');
+    t.append(playerBadge(p), `${playerName(p)} · ${p.character}`);
+    row.append(t);
   }
   return row;
 }
 
 function stripRow(s) {
   const row = el('div', 'strip');
-  row.append(...[whoBlock(s), ...progressBlocks(s), transformBlock(s)].filter(b => b.childNodes.length));
+  row.append(...[whoBlock(s), playersBlock(s), ...progressBlocks(s), transformBlock(s)].filter(b => b.childNodes.length));
   return row;
 }
 
@@ -238,7 +271,7 @@ function sideColumn(s) {
   const who = whoBlock(s);
   const [meters, tags] = progressBlocks(s);
   const pages = el('div', 'pages');
-  pages.append(...meters.childNodes, ...[tags, transformBlock(s)].filter(b => b.childNodes.length));
+  pages.append(...[playersBlock(s)].filter(b => b.childNodes.length), ...meters.childNodes, ...[tags, transformBlock(s)].filter(b => b.childNodes.length));
   side.append(...[who, pages].filter(b => b.childNodes.length));
   return side;
 }
@@ -333,7 +366,7 @@ setInterval(() => {
 const itemInfo = i => `${i.desc ? ' — ' + i.desc : ''}${i.floorLabel ? ' (' + i.floorLabel + ')' : ''}${i.blind ? ' — ' + tr('view.blind') : ''}`;
 
 // idx: posición del objeto en la partida, para encontrar su icono (estilos «vuelo», «foco» y «pulso»).
-function itemTile(i, latest, hoverDesc, idx) {
+function itemTile(i, latest, hoverDesc, idx, player) {
   const t = el('div', 'item' + (i.removed ? ' removed' : '') + (i.blind ? ' blind' : '') + (latest ? ' latest' : ''));
   t.dataset.idx = idx;
   // La vista se redibuja con cada lectura: el pulso sigue en el icono nuevo mientras dure.
@@ -351,6 +384,11 @@ function itemTile(i, latest, hoverDesc, idx) {
   if (owner) {
     if (t.title) t.title += ' — ' + tr(owner.key);
     t.append(ownerBadge(i.owner));
+  }
+  if (player) {
+    t.tipPlayer = player;
+    if (t.title) t.title += ' — ' + playerName(player);
+    t.append(playerBadge(player));
   }
   return t;
 }
@@ -371,16 +409,23 @@ function lastTaken(items) {
 function shelfRow(s) {
   const { options } = s.config, wrap = el('div', 'shelf' + (options.floorGroups ? ' floors' : ''));
   let items = s.run.items;
-  const latest = lastTaken(items);
+  const latest = lastTaken(items.filter(mineFilter(s)));
   const index = new Map(items.map((x, n) => [x, n]));
+  // Partida online: los de todos con insignia, solo los propios o una fila por jugador.
+  const mode = s.run.players ? options.coopItems : null;
+  if (mode === 'mine') items = items.filter(i => i.player === s.run.me);
   if (options.removed === 'hide') items = items.filter(i => !i.removed);
   if (options.maxItems) items = items.slice(-options.maxItems);
+  if (mode === 'rows') { items = [...items].sort((a, b) => a.player - b.player); wrap.classList.add('by-player'); }
   // Si la maldición del ciego se quita a mitad de piso (Black Candle, Genesis), el piso se parte en dos tramos:
-  // lo tomado con ella ("D2 ?") y lo tomado después ("D2").
-  const groupOf = i => i.floor + (i.blind && options.blindMark !== 'none' ? '?' : '');
-  let group = null;
+  // lo tomado con ella ("D2 ?") y lo tomado después ("D2"). En filas por jugador, cada fila tiene sus pisos.
+  const groupOf = i => (mode === 'rows' ? i.player + ':' : '') + i.floor + (i.blind && options.blindMark !== 'none' ? '?' : '');
+  let group = null, lastPlayer = null;
   for (const i of items) {
-    const tile = itemTile(i, i === latest, options.hoverDesc, index.get(i));
+    // Cada jugador empieza en una fila nueva.
+    if (mode === 'rows' && lastPlayer !== null && i.player !== lastPlayer) wrap.append(el('div', 'player-break'));
+    lastPlayer = i.player;
+    const tile = itemTile(i, i === latest, options.hoverDesc, index.get(i), mode && mode !== 'mine' ? runPlayer(s.run, i) : null);
     if (options.floorGroups) {
       tile.dataset.floor = groupOf(i);
       if (groupOf(i) !== group) tile.prepend(floorMark(i));
@@ -420,7 +465,7 @@ function spaceFloorLabels(shelf) {
 }
 
 function descRow(s) {
-  const last = lastTaken(s.run.items);
+  const last = lastTaken(s.run.items.filter(mineFilter(s)));
   const row = el('div', 'desc');
   if (last) { row.append(el('strong', '', last.name)); if (last.desc) row.append(' — ' + last.desc); }
   return row;
@@ -435,6 +480,16 @@ const TEXT_SCALE = {
   regular: { '--small': '.85em', '--large': '1.15em', '--label': '12px', '--floor-h': '14px', '--hero-title': 'clamp(1.3em, 14vh, 2.4em)', '--hero-desc': '1em' },
   pixel: { '--small': '15px', '--large': '1em', '--label': '15px', '--floor-h': '14px', '--hero-title': '30px', '--hero-desc': '15px' },
 };
+// Tamaño de cada texto de la partida actual: su tamaño normal (el de TEXT_SCALE) por su % configurado.
+// Así siguen a «Tamaño» y conservan sus proporciones. Se redondea a píxeles enteros para no emborronar las letras.
+function runTextVars(o, pixel) {
+  const base = o.fontSize, small = pixel ? 15 : base * 0.85, large = pixel ? base : base * 1.15;
+  const px = (size, pct) => Math.max(8, Math.round(size * (pct || 100) / 100)) + 'px';
+  return {
+    '--run-char': px(large, o.runCharScale), '--run-info': px(base, o.runInfoScale), '--run-seed': px(small, o.runInfoScale),
+    '--run-tf': px(small, o.runTransformsScale), '--run-desc': px(base, o.runDescScale),
+  };
+}
 // Upheaval vale tanto incluida en app/ ("Upheaval") como instalada en Windows ("Upheaval TT (BRK)").
 const PIXEL_FONTS = /^Upheaval\b/i;
 
@@ -534,8 +589,9 @@ const BADGE_SCALE = { small: 0.3, medium: 0.45, large: 0.6 };
 
 function applyStyle(o) {
   const icon = { none: 'none', glow: `drop-shadow(0 0 3px ${o.accentColor})`, shadow: 'drop-shadow(1px 2px 1px #000)' };
+  const pixel = PIXEL_FONTS.test(o.font);
   const vars = {
-    ...TEXT_SCALE[PIXEL_FONTS.test(o.font) ? 'pixel' : 'regular'],
+    ...TEXT_SCALE[pixel ? 'pixel' : 'regular'], ...runTextVars(o, pixel),
     '--font': `"${o.font}", system-ui, sans-serif`, '--size': o.fontSize + 'px', '--weight': o.bold ? 600 : 400,
     '--text': o.textColor, '--accent': o.accentColor, '--done': o.doneColor, '--text-shadow': TEXT_EFFECTS[o.textEffect], '--blind': o.blindColor,
     // Iconos de logros proporcionales al texto: 28 px con el tamaño por defecto (20).
@@ -608,7 +664,7 @@ function fitShelf({ padding, iconAuto, iconSize, layout, rows, overflow, pageMin
   const shelf = view.querySelector('.shelf');
   if (!shelf) return;
   const room = window.innerHeight - padding * 2;
-  const rowCount = () => new Set([...shelf.children].map(c => c.offsetTop)).size;
+  const rowCount = () => new Set([...shelf.querySelectorAll(':scope > .item')].map(c => c.offsetTop)).size;
   const fits = () => view.offsetHeight <= room && (!rows || rowCount() <= rows);
   const tryLayout = (size, share) => {
     document.documentElement.style.setProperty('--icon', size + 'px');
@@ -809,7 +865,9 @@ function detectPickups(s) {
     seen.seed = seed;
     seen.since = Date.now();
   } else if (items.length > seen.count && s.config.options.highlight && Date.now() - seen.since > NEW_RUN_GRACE_MS) {
-    const fresh = items.slice(seen.count).filter(i => !i.removed && !i.soul && !i.granted).map(i => ({ ...i, idx: items.indexOf(i) }));
+    const mine = mineFilter(s);
+    const fresh = items.slice(seen.count).filter(i => !i.removed && !i.soul && !i.granted && mine(i))
+      .map(i => ({ ...i, idx: items.indexOf(i), playerInfo: runPlayer(s.run, i) }));
     queue.push(...(fresh.length > MAX_BATCH ? fresh.slice(-1) : fresh));
     playNext();
   }
@@ -847,6 +905,7 @@ function heroCaption(item) {
   const text = el('div', 'hero-text');
   text.append(el('small', '', item.floorLabel ? `${tr('view.newItem')} · ${item.floorLabel}` : tr('view.newItem')));
   if (OWNERS[item.owner]) text.firstChild.append(` · ${tr(OWNERS[item.owner].key)}`);
+  if (item.playerInfo) text.firstChild.append(` · ${playerName(item.playerInfo)}`);
   if (item.blind) text.firstChild.append(el('span', 'hero-blind', ' · ' + tr('view.blind')));
   text.append(el('strong', '', item.name));
   if (item.desc) text.append(el('p', '', item.desc));
@@ -1019,11 +1078,12 @@ async function refresh() {
   if (text === lastState) return;
   lastState = text;
   current = JSON.parse(text);
-  lang = current.lang;
+  lang = current.viewLang || current.lang;
   document.documentElement.lang = lang;
-  if (lang !== namesLang) {
-    namesLang = lang;
-    try { await loadNames(); } catch { namesLang = null; }
+  const key = lang + '|' + (current.namesLang || lang);
+  if (key !== namesKey) {
+    namesKey = key;
+    try { await loadNames(); } catch { namesKey = null; }
   }
   render(current);
   detectPickups(current);
@@ -1047,6 +1107,7 @@ function showTip(tile) {
   const i = tile.tipItem;
   tip.replaceChildren(el('strong', '', i.name), itemInfo(i));
   if (OWNERS[i.owner]) tip.append(' — ' + tr(OWNERS[i.owner].key));
+  if (tile.tipPlayer) tip.append(' — ' + playerName(tile.tipPlayer));
   tip.classList.remove('top');
   tip.hidden = false;
   // Abajo, salvo que tape el propio objeto: entonces va arriba.
@@ -1058,9 +1119,9 @@ view.addEventListener('mouseover', e => {
 });
 view.addEventListener('mouseleave', hideTip);
 
-// Los nombres de contadores y logros dependen del idioma: se vuelven a pedir cuando cambia.
+// Los nombres de contadores y logros dependen de los idiomas de la vista: se vuelven a pedir cuando cambian.
 async function loadNames() {
-  const c = await fetch('api/choices').then(r => r.json());
+  const c = await fetch('api/names' + QUERY).then(r => r.json());
   names = {
     goals: Object.fromEntries(c.goals.map(g => [g.id, g.name])),
     watched: Object.fromEntries(c.watched.map(w => [w.id, w.name])),
