@@ -67,6 +67,25 @@ test('un reroll (D4) quita los pasivos que tenía y deja los nuevos como no reco
   assert.ok(log.run.items.filter(i => i.id > 10 && i.id < 20).every(i => i.granted));
 });
 
+test('con pocos pasivos, varios objetos dados de golpe que no coinciden no se toman por reroll', t => {
+  const { write, live } = setup(t);
+  start(write);
+  for (const id of [1, 2]) write(...pick(id));
+  write(...[10, 11, 12].map(id => L.add(id)));
+  assert.deepStrictEqual(live(), [1, 2, 10, 11, 12]);
+});
+
+test('con pocos pasivos, un reroll que añade justo esos pasivos sí se reconoce', t => {
+  const { write, live } = setup(t);
+  start(write);
+  for (const id of [1, 2, 3]) write(...pick(id));
+  write(...[11, 12, 13].map(id => L.add(id)));
+  assert.deepStrictEqual(live(), [11, 12, 13]);
+  // Un pasivo que sale activo: tantos pasivos como antes más el activo.
+  write(...[21, 22, 23].map(id => L.add(id)), L.add(105, 'The D6'));
+  assert.deepStrictEqual(live(), [21, 22, 23, 105]);
+});
+
 test('un objeto suelto sin recoger (un regalo) no se toma por reroll', t => {
   const { write, live } = setup(t);
   start(write);
@@ -220,6 +239,20 @@ test('Glowing Hourglass también se reconoce si la transición vuelve al frame d
   // Lo siguiente vuelve a ser normal.
   write(...go('Sala B', '1.20', 450), ...pick(3));
   assert.deepStrictEqual(log.run.items.map(i => i.id), [1, 3]);
+});
+
+test('un teletransporte a la sala anterior (dos transiciones en el mismo frame) no deshace nada', t => {
+  const { log, write } = setup(t);
+  start(write);
+  write(...go('Sala A', '4.42', 100), ...pick(1));
+  write(...go('Sala B', '5.10', 300), ...pick(2));
+  const tp = n => `[INFO] - [Frame ${n}] Starting room transition (type 3) `;
+  write(tp(500), tp(500), L.room('Sala A', '4.42'));
+  assert.deepStrictEqual(log.run.items.map(i => i.id), [1, 2]);
+  // Un Glowing Hourglass después sigue reconociéndose.
+  write(...go('Sala B', '5.10', 600), ...pick(3));
+  write(...go('Sala A', '4.42', 600));
+  assert.deepStrictEqual(log.run.items.map(i => i.id), [1, 2]);
 });
 
 test('Glowing Hourglass en la primera sala de un piso vuelve al piso anterior sin lo tomado en el nuevo', t => {

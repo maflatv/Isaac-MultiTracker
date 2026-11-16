@@ -56,7 +56,7 @@ const DEFAULTS = {
   goals: [],
   watched: [],
   options: {
-    ...APPEARANCE, layout: 'banner', iconAuto: true, iconSize: 40, rows: 0, maxItems: 0, removed: 'hide', markItem: 'hover', hoverDesc: true, progressStyle: 'icons', pendingLook: 'color', hideDone: false, floorGroups: true, transformsClose: true, highlight: true, highlightSeconds: 5,
+    ...APPEARANCE, layout: 'banner', iconAuto: true, iconSize: 40, rows: 0, maxItems: 0, removed: 'dim', markItem: 'hover', hoverDesc: true, progressStyle: 'icons', pendingLook: 'color', hideDone: false, floorGroups: true, transformsClose: true, highlight: true, highlightSeconds: 5,
     // Cómo se destaca el objeto recién tomado: pantalla completa, aviso en una esquina, vuelo hasta su hueco, foco sobre
     // él, marquesina o solo un pulso en su icono.
     highlightStyle: 'full',
