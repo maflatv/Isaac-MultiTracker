@@ -367,8 +367,9 @@ const itemInfo = i => `${i.desc ? ' — ' + i.desc : ''}${i.floorLabel ? ' (' + 
 
 // idx: posición del objeto en la partida, para encontrar su icono (estilos «vuelo», «foco» y «pulso»).
 function itemTile(i, latest, hoverDesc, idx, player) {
-  const t = el('div', 'item' + (i.removed ? ' removed' : '') + (i.blind ? ' blind' : '') + (latest ? ' latest' : ''));
+  const t = el('div', 'item' + (i.removed ? ' removed' : '') + (i.blind ? ' blind' : '') + (latest ? ' latest' : '') + (i.id < 0 ? ' glitched' : ''));
   t.dataset.idx = idx;
+  if (i.id < 0) t.style.setProperty('--glitch-hue', (-i.id * 67) % 360 + 'deg');
   // La vista se redibuja con cada lectura: el pulso sigue en el icono nuevo mientras dure.
   if (pulse && pulse.idx === idx && Date.now() < pulse.until) t.classList.add('pulse');
   // Con la descripción al pasar el puntero, el recuadro del navegador la repetiría con retraso.
@@ -913,9 +914,10 @@ function heroCaption(item) {
 }
 
 function itemImage(item, className) {
-  const img = el('img', className);
+  const img = el('img', className + (item.id < 0 ? ' glitched' : ''));
   img.src = `icon/item/${item.id}.png`;
   img.alt = '';
+  if (item.id < 0) img.style.setProperty('--glitch-hue', (-item.id * 67) % 360 + 'deg');
   img.onerror = () => { img.style.visibility = 'hidden'; };
   return img;
 }

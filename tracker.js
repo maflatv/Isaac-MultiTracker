@@ -355,13 +355,17 @@ function createTracker({ resDir, gameDir, steamUserdata, dataDir }, options = {}
   const currentSave = () => { try { return selectedSave(loadConfig()); } catch { return null; } };
   for (const create of options.extensions || []) extensions.push(create({ dataDir, gameData, selectedSave: currentSave, currentRun: () => runLog.run }));
 
+  // El nombre de un objeto glitcheado son bytes al azar: sin caracteres de control y, si no queda nada, un marcador.
+  // El log se lee como latin1, pero el juego escribe esos bytes en UTF-8: se recodifican para verlos como en el log.
+  const glitchedName = name => Buffer.from(name || '', 'latin1').toString('utf8').replace(/[\u0000-\u001f\u007f-\u009f]/g, '').trim() || '???';
+
   // r: la partida del log o la de otra persona, tal como la sube su MultiTracker (shareRun()).
   function runView(lang, namesLang, r = runLog.run) {
     if (!r) return null;
     const { info, itemName, characterName, transformName, describe } = gameData();
     const items = r.items.filter(i => !(info[i.id] && info[i.id].shown === false)).map(i => {
       const f = r.floors[i.floor];
-      return { id: i.id, name: itemName(i.id, namesLang, i.name), blind: i.blind, removed: i.removed, floor: i.floor, floorLabel: f ? floorLabel(f) : '', desc: describe(i.id, lang), owner: i.owner, soul: !!i.soul, granted: !!i.granted, player: i.player || 0 };
+      return { id: i.id, name: i.id < 0 ? glitchedName(i.name) : itemName(i.id, namesLang, i.name), blind: i.blind, removed: i.removed, floor: i.floor, floorLabel: f ? floorLabel(f) : '', desc: describe(i.id, lang), owner: i.owner, soul: !!i.soul, granted: !!i.granted, player: i.player || 0 };
     });
     // Partida online con más de un jugador: quién es cada uno. Las transformaciones son de cada personaje: solo cuentan
     // los objetos de quien juega en este PC.
@@ -568,6 +572,30 @@ function createTracker({ resDir, gameDir, steamUserdata, dataDir }, options = {}
     throw new UserError('err.badAction');
   }
 
+  // ---------- Perfil recomendado ----------
+  // La configuración que recomienda el autor (data/recommended-profile.json). Se añade una sola vez a la lista de
+  // perfiles sin tocar nada de lo guardado; si se borra, no vuelve. En una instalación nueva es también la configuración
+  // principal, la que abre el panel.
+  function addRecommended() {
+    const stored = readStored();
+    if (stored.recommendedAdded) return;
+    let preset;
+    try { preset = JSON.parse(readAsset('data/recommended-profile.json').toString('utf8')); } catch { return; }
+    const profiles = { ...profilesOf(stored) };
+    const fresh = !stored.options && !stored.show && !Object.keys(profiles).length;
+    const full = { ...stored, recommendedAdded: true };
+    if (Object.keys(profiles).length < MAX_PROFILES) {
+      const id = newId('p'), opts = sanitizeOptions(preset.options, {}), show = { ...DEFAULTS.show };
+      for (const k of GLOBAL_OPTIONS) delete opts[k];
+      for (const k of Object.keys(show)) if (preset.show && typeof preset.show[k] === 'boolean') show[k] = preset.show[k];
+      profiles[id] = { name: t(languageOf(stored), 'profile.recommended'), show, goals: [], watched: [], options: opts };
+      full.profiles = profiles;
+      if (fresh) Object.assign(full, { show: { ...show }, options: { ...opts } });
+    }
+    writeFile(CONFIG_FILE, JSON.stringify(full, null, 2));
+  }
+  addRecommended();
+
   // ---------- Temas del usuario ----------
   // save: guarda la apariencia recibida con un nombre; rename y delete. Devuelve la lista de temas.
   function themeAction(b) {
@@ -626,6 +654,12 @@ function createTracker({ resDir, gameDir, steamUserdata, dataDir }, options = {}
   const file = (buf, rel) => (buf ? { status: 200, type: MIME[path.extname(rel).toLowerCase()] || 'application/octet-stream', body: buf } : json(404, { error: 'Not found' }));
 
   // cache: la vista puede reutilizar la imagen. Un icono que falta no se marca, por si aparece después.
+  // Los objetos glitcheados no tienen icono propio: el juego los dibuja con trozos de otros y el log no dice cuáles.
+  // Todos usan el «?» del juego; el overlay le da un color distinto por id.
+  function itemIcon(id) {
+    return id >= 0 ? gameData().icons.get(id) : path.join('gfx', 'items', 'collectibles', 'questionmark.png');
+  }
+
   function icon(rel) {
     const f = rel && safeJoin(resDir, rel);
     if (!f) return json(404, { error: 'No icon' });
@@ -676,7 +710,7 @@ function createTracker({ resDir, gameDir, steamUserdata, dataDir }, options = {}
       return json(200, { path: await choosePath(steamUserdata, { title: T('picker.title'), filter: T('picker.filter'), all: T('picker.all') }) });
     }
     let m;
-    if (method === 'GET' && (m = /^\/icon\/item\/(\d+)\.png$/.exec(pathname))) return icon(gameData().icons.get(+m[1]));
+    if (method === 'GET' && (m = /^\/icon\/item\/(-?\d+)\.png$/.exec(pathname))) return icon(itemIcon(+m[1]));
     if (method === 'GET' && (m = /^\/icon\/owner\/(\w+)\/(head|hair)\.png$/.exec(pathname)) && Object.hasOwn(OWNER_SPRITES, m[1]) && OWNER_SPRITES[m[1]][m[2]]) {
       return icon(path.join(COSTUMES, OWNER_SPRITES[m[1]][m[2]]));
     }

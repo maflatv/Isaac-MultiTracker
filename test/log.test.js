@@ -341,3 +341,36 @@ test('online: la partida online no pisa la de la ranura 1', t => {
   write(L.seed('ABCD EFGH', 'Continue', 1));
   assert.deepStrictEqual(log.run.items.map(i => i.id), [1]);
 });
+
+test('los objetos glitcheados (id negativo) se añaden y se quitan, también con el nombre partido en dos líneas', t => {
+  const { log, write, live } = setup(t);
+  start(write);
+  write(L.flush(), '[INFO] - Adding collectible -4 (d of GlassBlo) to player 0 (Eden) from pool treasure');
+  write(L.flush(), '[INFO] - Adding collectible -65 (\x01LD\xca\xb3', '\x01Dad\'s N) to player 0 (Eden) from pool treasure');
+  assert.deepStrictEqual(live(), [-4, -65]);
+  assert.ok(log.run.items[1].name.includes('Dad\'s N'));
+  write('[INFO] - Removing collectible -4 (d of GlassBlo) from player 0 (Eden)');
+  assert.deepStrictEqual(live(), [-65]);
+});
+
+test('Missing No. cambia los pasivos al empezar el piso, pero se queda', t => {
+  const { write, live } = setup(t);
+  start(write);
+  for (const id of [258, 2, 3, 4, 5]) write(...pick(id));
+  write(L.stage(500), L.level(2), L.room('Start Room'), ...[11, 12, 13, 14].map(id => L.add(id)));
+  assert.deepStrictEqual(live(), [258, 11, 12, 13, 14]);
+  write(...go('Sala', '1.5', 600), ...pick(20));
+  assert.deepStrictEqual(live(), [258, 11, 12, 13, 14, 20]);
+});
+
+test('un activo glitcheado que se suelta en un pedestal sigue en el piso donde se tomó, aunque se vuelva a coger', t => {
+  const { log, write, live } = setup(t);
+  start(write);
+  write(...pick(-3, 'jwi'));
+  write(L.level(2), L.room('Start Room'), L.remove(-3), '[INFO] - Entity Pickup Initialized as: 5.100.-3  Seed: 3ab3124d ', ...pick(-19, 'drops'));
+  write(L.remove(-19), '[INFO] - Entity Pickup Initialized as: 5.100.-19  Seed: 3ab3124d ', ...pick(-3, 'jwi'));
+  assert.deepStrictEqual(log.run.items.map(i => [i.id, i.floor, !!i.removed]), [[-3, 0, false], [-19, 1, false]]);
+  // Un pasivo glitcheado que se pierde sin pedestal sí se quita.
+  write(...pick(-20, 'Mega'), L.remove(-20));
+  assert.deepStrictEqual(live(), [-3, -19]);
+});
