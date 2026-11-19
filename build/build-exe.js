@@ -1,8 +1,11 @@
-// Genera en dist/ las dos formas de MultiTracker para Windows:
+// Genera el programa para el sistema en el que se ejecuta.
+// En Windows, en dist/, las dos formas de MultiTracker:
 // - MultiTracker-Setup-<versión>.exe: instalador. La versión instalada se actualiza sola desde las releases de GitHub
 //   y descarga solo lo que cambia gracias al .blockmap; latest.yml le dice cuál es la última versión.
 // - MultiTracker.exe: portable, un solo archivo sin instalar nada. También va en el .zip, con las licencias a la vista.
-// Uso: node build/build-exe.js 1.10.2. Los cinco archivos de dist/ van en la release v1.9.0 de GitHub.
+// En Linux (desde Windows, con WSL), en dist-linux/: MultiTracker-<versión>-x86_64.AppImage, que también se actualiza
+// solo, y su latest-linux.yml.
+// Uso: node build/build-exe.js 1.10.3. Los archivos de dist/ y dist-linux/ van en la release de esa versión en GitHub.
 // Solo incluye lo que Git publicaría: lo ignorado (userdata/, la fuente Upheaval...) nunca llega al programa.
 // Con --avanzada genera la edición avanzada (splits de LiveSplit) en dist-avanzada/: otro programa, con su propio
 // nombre, carpeta de ajustes e instalación, que no se publica ni se actualiza solo. La normal no lleva sus archivos.
@@ -12,7 +15,7 @@ const { execFileSync } = require('child_process');
 const { ROOT, WORK, ELECTRON, ELECTRON_UPDATER, installTools, installRuntime, run } = require('./tools.js');
 
 const VERSION = process.argv[2];
-if (!/^\d+\.\d+\.\d+$/.test(VERSION || '')) throw new Error('Indica la versión: node build/build-exe.js 1.10.2 [--avanzada]');
+if (!/^\d+\.\d+\.\d+$/.test(VERSION || '')) throw new Error('Indica la versión: node build/build-exe.js 1.10.3 [--avanzada]');
 const ADVANCED = process.argv.includes('--avanzada');
 const REPO = { owner: 'maflatv', repo: 'Isaac-MultiTracker' };
 const NAME = ADVANCED ? 'MultiTracker Avanzado' : 'MultiTracker';
@@ -20,14 +23,17 @@ const FILE_NAME = ADVANCED ? 'MultiTracker-Avanzado' : 'MultiTracker';
 // Archivos que solo lleva la edición avanzada.
 const ADVANCED_FILES = ['lib/splitter.js', 'lib/splits.js', 'lib/livesplit.js', 'app/livesplit.html', 'app/livesplit.js', 'app/livesplit.css', 'app/livesplit-i18n.js'];
 
-const DIST = path.join(ROOT, ADVANCED ? 'dist-avanzada' : 'dist');
+const LINUX = process.platform === 'linux';
+if (!LINUX && process.platform !== 'win32') throw new Error('Solo se compila en Windows o en Linux (WSL).');
+const DIST = path.join(ROOT, (ADVANCED ? 'dist-avanzada' : 'dist') + (LINUX ? '-linux' : ''));
 const STAGE = path.join(WORK, 'stage');
 const OUT = path.join(WORK, 'out');
 // Lo que necesita la aplicación en marcha. El resto del repositorio (README, pruebas, scripts .bat...) no va dentro.
-const APP_FILES = ['app', 'data', 'lib', 'desktop', 'tracker.js', 'paths.js', 'server.js', 'build/icon.ico', 'LICENSE'];
+const APP_FILES = ['app', 'data', 'lib', 'desktop', 'tracker.js', 'paths.js', 'server.js', 'build/icon.ico', 'build/icon.png', 'LICENSE'];
 const SETUP = `${FILE_NAME}-Setup-${VERSION}.exe`;
 const PORTABLE = `${FILE_NAME}.exe`;
 const ZIP = `${FILE_NAME}-${VERSION}-windows-x64.zip`;
+const APPIMAGE = `${FILE_NAME}-${VERSION}-x86_64.AppImage`;
 
 function stage() {
   fs.rmSync(STAGE, { recursive: true, force: true });
@@ -72,6 +78,12 @@ function builderConfig() {
       multiLanguageInstaller: true, installerLanguages: ['en_US', 'es_ES', 'fr_FR', 'pt_BR', 'ru_RU'],
     },
     portable: { artifactName: PORTABLE },
+    // AppImage: un solo archivo que se abre sin instalar. Sus ajustes van en ~/.config/MultiTracker.
+    linux: {
+      target: [{ target: 'AppImage', arch: ['x64'] }], icon: path.join(STAGE, 'build', 'icon.png'),
+      category: 'Game', executableName: FILE_NAME.toLowerCase(), artifactName: APPIMAGE,
+      synopsis: 'Item and Dead God progress tracker for The Binding of Isaac: Repentance+',
+    },
     // De aquí lee la versión instalada dónde buscar actualizaciones (app-update.yml). Esto no publica nada.
     // La edición avanzada no se publica: sin esto no busca las actualizaciones de la normal.
     publish: ADVANCED ? null : [{ provider: 'github', owner: REPO.owner, repo: REPO.repo }],
@@ -88,8 +100,14 @@ async function main() {
 
   const configFile = path.join(WORK, 'electron-builder.json');
   fs.writeFileSync(configFile, JSON.stringify(builderConfig(), null, 2));
-  run(process.execPath, [path.join(WORK, 'node_modules', 'electron-builder', 'cli.js'), '--win', '--projectDir', STAGE, '--config', configFile, '--publish', 'never']);
+  run(process.execPath, [path.join(WORK, 'node_modules', 'electron-builder', 'cli.js'), LINUX ? '--linux' : '--win', '--projectDir', STAGE, '--config', configFile, '--publish', 'never']);
 
+  if (LINUX) {
+    for (const f of [APPIMAGE, ...(ADVANCED ? [] : ['latest-linux.yml'])]) fs.copyFileSync(path.join(OUT, f), path.join(DIST, f));
+    fs.chmodSync(path.join(DIST, APPIMAGE), 0o755);
+    console.log(`Listo en ${DIST}: ${APPIMAGE}${ADVANCED ? ' (edición avanzada, solo para uso local)' : ' y latest-linux.yml, para la release'}.`);
+    return;
+  }
   for (const f of [PORTABLE, SETUP, ...(ADVANCED ? [] : [`${SETUP}.blockmap`, 'latest.yml'])]) fs.copyFileSync(path.join(OUT, f), path.join(DIST, f));
   if (ADVANCED) {
     console.log(`Listo en ${DIST}: ${SETUP} y ${PORTABLE} (edición avanzada, solo para uso local).`);

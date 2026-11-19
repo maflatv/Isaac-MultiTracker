@@ -4,7 +4,10 @@
 
 # Archivos generados al compilar
 /.build/
+/.build-linux/
 /dist/
+/dist-linux/
+/dist-avanzada-linux/
 
 # Fuente opcional: cada usuario la añade por su cuenta (consulta el README)
 /app/upheaval.ttf

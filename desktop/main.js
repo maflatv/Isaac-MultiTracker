@@ -15,7 +15,8 @@ const ORIGIN = `${SCHEME}://app`;
 const DATA_DIR = path.join(BASE_DIR, 'userdata');
 // Tamaño y posición de las ventanas, para abrirlas como se dejaron en la sesión anterior.
 const WINDOWS_FILE = path.join(DATA_DIR, 'windows.json');
-const ICON = path.join(APP_ROOT, 'build', 'icon.ico');
+// Windows usa el .ico; Linux necesita un PNG.
+const ICON = path.join(APP_ROOT, 'build', process.platform === 'win32' ? 'icon.ico' : 'icon.png');
 const OBS_PORT = Number(process.env.PORT) || DEFAULT_PORT;
 // Tamaño del área útil de la vista: el mismo banner que la ventana de Rebirth Item Tracker.
 const VIEW_SIZE = { width: 900, height: 121 };

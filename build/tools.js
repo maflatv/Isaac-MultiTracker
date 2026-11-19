@@ -5,7 +5,10 @@ const path = require('path');
 const { execFileSync } = require('child_process');
 
 const ROOT = path.resolve(__dirname, '..');
-const WORK = path.join(ROOT, '.build');
+// Linux (WSL sobre la misma carpeta) tiene sus propias herramientas: el Electron de Windows no le sirve.
+const IS_WINDOWS = process.platform === 'win32';
+const WORK = path.join(ROOT, IS_WINDOWS ? '.build' : '.build-linux');
+const ELECTRON_BIN = IS_WINDOWS ? 'electron.exe' : 'electron';
 // Versiones fijas: una compilación debe dar siempre el mismo resultado.
 const ELECTRON = '44.9.3';
 const ELECTRON_BUILDER = '26.18.0';
@@ -27,7 +30,7 @@ function installTools() {
     run('npm', ['install', '--no-save', '--no-audit', '--no-fund', `electron@${ELECTRON}`, `electron-builder@${ELECTRON_BUILDER}`], { shell: true });
   }
   // npm no siempre ejecuta el script que descarga Electron: se lanza aquí si falta el programa.
-  if (!fs.existsSync(path.join(WORK, 'node_modules', 'electron', 'dist', 'electron.exe'))) {
+  if (!fs.existsSync(path.join(WORK, 'node_modules', 'electron', 'dist', ELECTRON_BIN))) {
     run(process.execPath, [path.join(WORK, 'node_modules', 'electron', 'install.js')]);
   }
 }
