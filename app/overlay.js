@@ -376,9 +376,9 @@ function itemTile(i, latest, hoverDesc, idx, player) {
   if (hoverDesc) t.tipItem = i;
   else t.title = i.name + itemInfo(i);
   const img = el('img');
-  img.src = `icon/item/${i.id}.png`;
+  // Los objetos de mods traen su icono (de la carpeta del mod); si no lo hay, se muestra su nombre.
+  img.src = i.icon || `icon/item/${i.id}.png`;
   img.alt = i.name;
-  // Los objetos de mods no tienen icono en los recursos del juego: se muestra su nombre.
   img.onerror = () => img.replaceWith(el('span', 'item-name', i.name));
   t.append(img);
   const owner = OWNERS[i.owner];
@@ -915,7 +915,7 @@ function heroCaption(item) {
 
 function itemImage(item, className) {
   const img = el('img', className + (item.id < 0 ? ' glitched' : ''));
-  img.src = `icon/item/${item.id}.png`;
+  img.src = item.icon || `icon/item/${item.id}.png`;
   img.alt = '';
   if (item.id < 0) img.style.setProperty('--glitch-hue', (-item.id * 67) % 360 + 'deg');
   img.onerror = () => { img.style.visibility = 'hidden'; };

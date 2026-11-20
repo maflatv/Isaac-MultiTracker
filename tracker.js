@@ -1,6 +1,7 @@
 // Tracker unificado: partida actual (log.txt) y progreso hacia Dead God (guardado). Solo lee archivos del juego.
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const { safeJoin, MIME, send, readBody, writeFile, readJson } = require('./lib/http.js');
 const { readAsset } = require('./lib/runtime.js');
 const { pickFile } = require('./lib/filepicker.js');
@@ -11,10 +12,13 @@ const { createAchievementIcons } = require('./lib/steamicons.js');
 const { COSTUMES, OWNER_SPRITES } = require('./lib/resources.js');
 const { SaveError, parseSave, summarize, listSaves, COUNTER_GOALS, WATCHED_ACHIEVEMENTS } = require('./lib/save.js');
 const { loadGameData, floorLabel, TRANSFORMS, TRANSFORM_GOAL } = require('./lib/gamedata.js');
+const { loadModCatalog } = require('./lib/mods.js');
 const { LANGUAGES, resolve: resolveLanguage, t } = require('./app/i18n.js');
 const { Remote, normalizeCode, isCode, DEFAULT_RELAY } = require('./lib/remote.js');
 
 const LOG_POLL_MS = 1000;
+// Los trinkets absorbidos van como objetos con este desplazamiento (igual que en lib/log.js y items.json).
+const TRINKET_OFFSET = 2000;
 // El contador de frames de la partida avanza 30 veces por segundo.
 const GAME_FPS = 30;
 const PLAYTIME_VERSION = 1;
@@ -252,6 +256,19 @@ function createTracker({ resDir, gameDir, steamUserdata, dataDir }, options = {}
   let data = null;
   const gameData = () => (data = data || loadGameData(resDir));
   const saves = () => listSaves(steamUserdata, gameDir);
+  // Objetos y personajes de los mods con que se jugó cada partida (run.mods), uno por lista de mods. La clave va en la
+  // dirección de sus iconos, para que no se confundan los de partidas con otros mods.
+  const modCatalogs = new Map();
+  function modsOf(run) {
+    if (!run || !Array.isArray(run.mods) || !run.mods.length) return null;
+    const key = crypto.createHash('sha1').update(run.mods.join('|')).digest('hex').slice(0, 12);
+    if (!modCatalogs.has(key)) {
+      let catalog = null;
+      try { catalog = { key, ...loadModCatalog(run.mods, gameData().modBase) }; } catch { /* mods ilegibles: solo nombres */ }
+      modCatalogs.set(key, catalog);
+    }
+    return modCatalogs.get(key);
+  }
 
   // ---------- Tiempo de juego por archivo ----------
   // El juego no lo guarda: se suma desde el contador de frames del log. Cada partida guarda su máximo, así que
@@ -293,7 +310,7 @@ function createTracker({ resDir, gameDir, steamUserdata, dataDir }, options = {}
   const extensions = [];
   let logLive = false;
   const onLogEvent = (type, d) => { if (logLive) for (const x of extensions) if (x.onLogEvent) x.onLogEvent(type, d); };
-  const runLog = new RunLog(path.join(gameDir, 'log.txt'), readJson(RUNS_FILE, {}), id => gameData().actives.has(id), id => gameData().quests.has(id), recordFrames, onLogEvent);
+  const runLog = new RunLog(path.join(gameDir, 'log.txt'), readJson(RUNS_FILE, {}), id => gameData().actives.has(id) || !!(modsOf(runLog.run) || { actives: new Set() }).actives.has(id), id => gameData().quests.has(id), recordFrames, onLogEvent);
   // Id de Steam de 64 bits de la cuenta abierta: el nombre de quien juega en este PC en las partidas online.
   let localUser;
   runLog.localUser = () => {
@@ -362,15 +379,23 @@ function createTracker({ resDir, gameDir, steamUserdata, dataDir }, options = {}
   // r: la partida del log o la de otra persona, tal como la sube su MultiTracker (shareRun()).
   function runView(lang, namesLang, r = runLog.run) {
     if (!r) return null;
-    const { info, itemName, characterName, transformName, describe } = gameData();
+    const { info, itemName, characterName, transformName, describe, modBase } = gameData();
+    // Objetos de mods: solo con los mods de la partida a mano (la propia). De la de otra persona queda el nombre del log.
+    const mods = modsOf(r);
+    const modded = id => id >= modBase.item && (id < TRINKET_OFFSET || id >= TRINKET_OFFSET + modBase.trinket);
     const items = r.items.filter(i => !(info[i.id] && info[i.id].shown === false)).map(i => {
       const f = r.floors[i.floor];
-      return { id: i.id, name: i.id < 0 ? glitchedName(i.name) : itemName(i.id, namesLang, i.name), blind: i.blind, removed: i.removed, floor: i.floor, floorLabel: f ? floorLabel(f) : '', desc: describe(i.id, lang), owner: i.owner, soul: !!i.soul, granted: !!i.granted, player: i.player || 0 };
+      const m = modded(i.id) ? { entry: mods && mods.resolve(i.id, i.name) } : null;
+      const name = i.id < 0 ? glitchedName(i.name) : m ? i.name || (m.entry && m.entry.name) || `#${i.id}` : itemName(i.id, namesLang, i.name);
+      const icon = m && m.entry && m.entry.icon ? `icon/mod/${mods.key}/${m.entry.n}.png` : undefined;
+      return { id: i.id, name, icon, blind: i.blind, removed: i.removed, floor: i.floor, floorLabel: f ? floorLabel(f) : '', desc: m ? (m.entry && m.entry.desc) || '' : describe(i.id, lang), owner: i.owner, soul: !!i.soul, granted: !!i.granted, player: i.player || 0 };
     });
+    // Personaje de mod: por su número en los mods de la partida o, si no se tienen, por el nombre que dio el log.
+    const charName = c => characterName(c) || (mods && mods.players.get(c) && mods.players.get(c).name) || '';
     // Partida online con más de un jugador: quién es cada uno. Las transformaciones son de cada personaje: solo cuentan
     // los objetos de quien juega en este PC.
     const players = r.players && r.players.length > 1
-      ? r.players.map((p, index) => ({ index, local: !!p.local, name: p.name || '', character: characterName(p.character) })) : null;
+      ? r.players.map((p, index) => ({ index, local: !!p.local, name: p.name || '', character: charName(p.character) })) : null;
     const me = players ? Math.max(0, players.findIndex(p => p.local)) : null;
     const seen = {};
     for (const i of r.items) {
@@ -382,7 +407,8 @@ function createTracker({ resDir, gameDir, steamUserdata, dataDir }, options = {}
     const floor = r.floors[r.floors.length - 1];
     return {
       seed: r.seed, slot: r.slot, players, me, seconds: Math.round((r.frames || 0) / GAME_FPS),
-      character: characterName(r.character),
+      // El nombre que dio el log es seguro; el del catálogo, una deducción por el orden de los mods.
+      character: characterName(r.character) || r.charName || charName(r.character),
       floor: floor ? floorLabel(floor) : '',
       items,
       transforms: Object.keys(seen).map(k => ({ id: k, name: transformName(k, namesLang), count: seen[k].size, goal: TRANSFORM_GOAL })),
@@ -395,7 +421,7 @@ function createTracker({ resDir, gameDir, steamUserdata, dataDir }, options = {}
   const shareRun = r => r && {
     seed: r.seed, slot: r.slot, mode: r.mode, character: r.character, floors: r.floors, items: r.items,
     players: r.players && r.players.map(({ local, character, name }) => ({ local, character, name })),
-    frames: r.frames, rewound: r.rewound, deadForm: r.deadForm, strawman: r.strawman,
+    frames: r.frames, rewound: r.rewound, deadForm: r.deadForm, strawman: r.strawman, charName: r.charName,
   };
   const storedShare = () => { const s = readStored().share; return s && typeof s === 'object' ? s : {}; };
   const activeShare = () => { const s = storedShare(); return s.enabled && isCode(s.code || '') && s.key ? s : null; };
@@ -666,6 +692,15 @@ function createTracker({ resDir, gameDir, steamUserdata, dataDir }, options = {}
     try { return { ...file(fs.readFileSync(f), f), cache: true }; } catch { return json(404, { error: 'No icon' }); }
   }
 
+  // Icono de un objeto de mod: está en la carpeta del mod, no en los recursos del juego. Solo se sirve lo que figura
+  // en un catálogo ya cargado, y solo imágenes .png.
+  function modIcon(key, n) {
+    const entry = modCatalogs.get(key) && modCatalogs.get(key).list[n];
+    const f = entry && entry.icon;
+    if (!f || path.extname(f).toLowerCase() !== '.png') return json(404, { error: 'No icon' });
+    try { return { ...file(fs.readFileSync(f), f), cache: true }; } catch { return json(404, { error: 'No icon' }); }
+  }
+
   // Responde a una petición sin depender de cómo llega: servidor HTTP, Isaac Suite o la ventana de escritorio.
   // readJsonBody() devuelve el cuerpo ya interpretado. Devuelve { status, type, body }.
   // query: los parámetros de la dirección (URLSearchParams); profile elige el perfil de la vista.
@@ -711,6 +746,7 @@ function createTracker({ resDir, gameDir, steamUserdata, dataDir }, options = {}
     }
     let m;
     if (method === 'GET' && (m = /^\/icon\/item\/(-?\d+)\.png$/.exec(pathname))) return icon(itemIcon(+m[1]));
+    if (method === 'GET' && (m = /^\/icon\/mod\/([0-9a-f]{12})\/(\d+)\.png$/.exec(pathname))) return modIcon(m[1], +m[2]);
     if (method === 'GET' && (m = /^\/icon\/owner\/(\w+)\/(head|hair)\.png$/.exec(pathname)) && Object.hasOwn(OWNER_SPRITES, m[1]) && OWNER_SPRITES[m[1]][m[2]]) {
       return icon(path.join(COSTUMES, OWNER_SPRITES[m[1]][m[2]]));
     }
