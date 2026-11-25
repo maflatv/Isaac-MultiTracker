@@ -363,6 +363,34 @@ test('Missing No. cambia los pasivos al empezar el piso, pero se queda', t => {
   assert.deepStrictEqual(live(), [258, 11, 12, 13, 14, 20]);
 });
 
+test('Missing No. también cambia los pasivos al recogerlo, y se queda', t => {
+  const { write, live } = setup(t);
+  start(write);
+  for (const id of [2, 3, 4]) write(...pick(id));
+  write(...pick(258), L.add(11), L.add(12), L.add(13));
+  assert.deepStrictEqual(live(), [258, 11, 12, 13]);
+});
+
+test('el dado de Dice Bag se quita al salir de la sala y no cuenta en el reroll de Missing No.', t => {
+  const { log, write, live } = setup(t);
+  start(write);
+  write(L.add(105, 'The D6'), ...go('Sala', '1.3'));
+  for (const id of [258, 2, 3, 4, 5, 6]) write(...pick(id));
+  // Dado de Dice Bag: aparece al entrar y se va justo antes de la sala siguiente.
+  write(L.add(476, 'D1'));
+  assert.deepStrictEqual(live(), [105, 258, 2, 3, 4, 5, 6, 476]);
+  write(L.remove(476), ...go('Otra', '1.4'));
+  assert.deepStrictEqual(live(), [105, 258, 2, 3, 4, 5, 6]);
+  // Un D6 de Dice Bag con el D6 en la mano: al irse no se lleva el de verdad.
+  write(L.add(105, 'The D6'), L.remove(105), ...go('Otra más', '1.5'));
+  assert.deepStrictEqual(live(), [105, 258, 2, 3, 4, 5, 6]);
+  // Piso nuevo: Missing No. cambia los cinco pasivos y Dice Bag da un D4 en la misma ráfaga.
+  write(L.stage(900), L.level(2), L.room('Start Room'), ...[11, 12, 13, 14, 15].map(id => L.add(id)), L.add(284, 'D4'));
+  write(L.remove(284), ...go('Sala', '1.3'));
+  assert.deepStrictEqual(live(), [105, 258, 11, 12, 13, 14, 15]);
+  assert.ok(!log.run.items.some(i => i.temporary));
+});
+
 test('un activo glitcheado que se suelta en un pedestal sigue en el piso donde se tomó, aunque se vuelva a coger', t => {
   const { log, write, live } = setup(t);
   start(write);
