@@ -70,7 +70,7 @@ test('capítulos: los pisos 1-8 de dos en dos y el resto cada uno el suyo', () =
 test('.lss: se leen los segmentos y se escribe uno que vuelve a leerse igual', () => {
   const text = S.writeLss({ game: 'Isaac & co', category: 'DeadGod%', segments: ['1. Pitch Black', 'T.Lilith - All, no greed', 'A <b> "c"'] });
   const back = S.readLss(text);
-  assert.deepStrictEqual(back, { game: 'Isaac & co', category: 'DeadGod%', segments: ['1. Pitch Black', 'T.Lilith - All, no greed', 'A <b> "c"'] });
+  assert.deepStrictEqual(back, { game: 'Isaac & co', category: 'DeadGod%', segments: ['1. Pitch Black', 'T.Lilith - All, no greed', 'A <b> "c"'], times: [0, 1, 2].map(() => ({ pb: null, gold: null })) });
   assert.throws(() => S.readLss('<xml/>'));
 });
 

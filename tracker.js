@@ -59,6 +59,9 @@ const DEFAULTS = {
   show: { character: true, players: true, seed: true, floor: true, runTime: false, items: true, description: false, transforms: true, playtime: false, achievements: true, collection: true, winStreak: true, marksHard: false, marksAny: false, challenges: false },
   goals: [],
   watched: [],
+  // Con progressStyle 'mixed': lo que se ve como barra (o texto); el resto, como icono. Totales (claves de show),
+  // contadores y logros vigilados.
+  asBars: [],
   options: {
     ...APPEARANCE, layout: 'banner', iconAuto: true, iconSize: 40, rows: 0, maxItems: 0, removed: 'dim', markItem: 'hover', hoverDesc: true, progressStyle: 'icons', pendingLook: 'color', hideDone: false, floorGroups: true, transformsClose: true, highlight: true, highlightSeconds: 5,
     // Cómo se destaca el objeto recién tomado: pantalla completa, aviso en una esquina, vuelo hasta su hueco, foco sobre
@@ -99,7 +102,7 @@ const LIMITS = {
 };
 const CHOICES = {
   layout: ['banner', 'wide'], removed: ['dim', 'hide'], markItem: ['none', 'latest', 'hover'], background: ['transparent', 'solid', 'brick'], textEffect: ['none', 'shadow', 'outline'],
-  iconEffect: ['none', 'glow', 'shadow'], progressStyle: ['icons', 'text', 'both'], pendingLook: ['color', 'gray'], align: ['left', 'center', 'right'], itemsPosition: ['above', 'below'],
+  iconEffect: ['none', 'glow', 'shadow'], progressStyle: ['icons', 'text', 'both', 'mixed'], pendingLook: ['color', 'gray'], align: ['left', 'center', 'right'], itemsPosition: ['above', 'below'],
   bgImageFit: ['cover', 'contain', 'stretch', 'tile', 'scale'], blindMark: ['floor', 'items', 'none'],
   whoOutline: ['none', 'outline', 'glow'],
   ownerBadgeSize: ['small', 'medium', 'large'], ownerBadgeCorner: ['bl', 'br', 'tl', 'tr'],
@@ -125,6 +128,8 @@ const FONT_NAME = /^[\p{L}\p{N} _\-.&+'()]{1,60}$/u;
 // Perfiles: la configuración principal ('main') y otras con sus propios ajustes de lo que se muestra y cómo.
 // Cada vista elige el suyo con ?profile= en la dirección (la ventana del tracker, la fuente de OBS, la vista previa).
 const MAIN = 'main';
+// Totales del progreso que pueden ir como barra o como icono (claves de show).
+const PROGRESS_TOTALS = ['achievements', 'collection', 'marksHard', 'marksAny', 'challenges'];
 const PROFILE_ID = /^p[0-9a-z]{1,20}$/;
 const THEME_ID = /^t[0-9a-z]{1,20}$/;
 const MAX_PROFILES = 10;
@@ -195,6 +200,7 @@ function createTracker({ resDir, gameDir, steamUserdata, dataDir }, options = {}
     const config = {
       ...DEFAULTS, ...c, profile: id,
       show: { ...DEFAULTS.show, ...own.show }, goals: Array.isArray(own.goals) ? own.goals : [], watched: Array.isArray(own.watched) ? own.watched : [],
+      asBars: Array.isArray(own.asBars) ? own.asBars : [],
       options: { ...DEFAULTS.options, ...own.options },
       themes: Array.isArray(c.themes) ? c.themes : [],
       profileList: [{ id: MAIN, name: '' }, ...Object.entries(profiles).map(([pid, p]) => ({ id: pid, name: p.name }))],
@@ -236,6 +242,7 @@ function createTracker({ resDir, gameDir, steamUserdata, dataDir }, options = {}
     const known = (list, ids) => (Array.isArray(list) ? list.filter(id => ids.includes(id)) : null);
     out.goals = known(b.goals, COUNTER_GOALS.map(g => g.id)) || out.goals;
     out.watched = known(b.watched, WATCHED_ACHIEVEMENTS.map(id => 's' + id)) || out.watched;
+    out.asBars = known(b.asBars, [...PROGRESS_TOTALS, ...COUNTER_GOALS.map(g => g.id), ...WATCHED_ACHIEVEMENTS.map(id => 's' + id)]) || out.asBars || [];
     sanitizeOptions(b.options, out.options);
     return out;
   }
@@ -554,7 +561,7 @@ function createTracker({ resDir, gameDir, steamUserdata, dataDir }, options = {}
     const stored = readStored(), id = profileId(stored, view.profile);
     const full = { ...stored };
     for (const k of GLOBAL_KEYS) full[k] = view[k];
-    const own = { show: view.show, goals: view.goals, watched: view.watched, options: { ...view.options } };
+    const own = { show: view.show, goals: view.goals, watched: view.watched, asBars: view.asBars || [], options: { ...view.options } };
     if (id === MAIN) Object.assign(full, own);
     else {
       full.options = { ...DEFAULTS.options, ...stored.options };
@@ -580,7 +587,7 @@ function createTracker({ resDir, gameDir, steamUserdata, dataDir }, options = {}
       if (Object.keys(profiles).length >= MAX_PROFILES) throw new UserError('err.tooManyProfiles', { max: MAX_PROFILES });
       const from = loadConfig(b.from), id = newId('p'), opts = { ...from.options };
       for (const k of GLOBAL_OPTIONS) delete opts[k];
-      profiles[id] = { name, show: from.show, goals: from.goals, watched: from.watched, options: opts };
+      profiles[id] = { name, show: from.show, goals: from.goals, watched: from.watched, asBars: from.asBars, options: opts };
       return persist({ ...stored, profiles }, id);
     }
     if (!PROFILE_ID.test(b.id || '') || !Object.hasOwn(profiles, b.id)) throw new UserError('err.profileMissing');

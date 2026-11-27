@@ -1,4 +1,4 @@
-// Página de LiveSplit (edición avanzada): conexión, modo de split, run de Dead God, ruta y su editor.
+// Página del cronómetro (edición avanzada): cronómetro propio con splits, modo de split, run de Dead God, ruta y su editor.
 const POLL_MS = 1000;
 const MANY_MARKS = 6;
 const $ = id => document.getElementById(id);
@@ -7,6 +7,8 @@ let status = null;
 let catalog = null;
 let editing = -1;
 let lastSegments = '';
+let timerLink = '';
+let resetTimerArmed = null;
 const tr = (key, vars) => LS_I18N.t(lang, key, vars);
 
 function applyTexts() {
@@ -84,20 +86,18 @@ function renderSettings() {
   $('autoStartLabel').textContent = tr(family() === 'deadgod' ? 'opt.autoStartDG' : 'opt.autoStart');
 }
 
-function renderConnection() {
-  const c = status.connection, st = status.settings;
-  let text;
-  if (!st.enabled) text = tr('conn.off');
-  else if (!c.connected) text = tr('conn.waiting', { port: st.port });
-  else {
-    text = tr('conn.ok') + (c.phase ? ' ' + tr('phase.' + c.phase) + '.' : '');
-    if (c.phase === 'Running' || c.phase === 'Paused') text += ' ' + tr('conn.split', { n: c.index + 1, name: c.name || status.segments[c.index]?.name || '' });
-  }
-  $('connStatus').textContent = text;
-  $('connHelp').hidden = !st.enabled || c.connected;
-  const want = status.segments[c.index];
-  $('mismatch').hidden = !c.mismatch;
-  if (c.mismatch) $('mismatch').textContent = tr('conn.mismatch', { name: c.name, want: want ? want.name : '' });
+function renderTimer() {
+  const t = status.timer, st = status.settings;
+  $('timerClock').textContent = fmt(t.time) + '.' + Math.floor(((t.time || 0) * 10) % 10);
+  let text = st.enabled ? tr('phase.' + t.phase) + '.' : tr('timer.off');
+  if (t.phase === 'Running' || t.phase === 'Paused') text += ' ' + tr('timer.current', { n: t.index + 1, name: t.name || status.segments[t.index]?.name || '' });
+  if (t.problem) text += ' ' + tr(t.problem);
+  $('timerStatus').textContent = text;
+  const running = t.phase === 'Running', paused = t.phase === 'Paused', idle = t.phase === 'NotRunning';
+  const can = { start: idle, split: running, skip: running, undo: !idle && t.index > 0, pause: running || paused, reset: !idle };
+  for (const b of $('timerButtons').querySelectorAll('button')) b.disabled = !can[b.dataset.op];
+  $('timerPause').textContent = tr(paused ? 'timer.resume' : 'timer.pause');
+  $('timerLink').textContent = timerLink;
 }
 
 function renderSession() {
@@ -114,8 +114,8 @@ function renderRoute() {
 }
 
 function renderSegments() {
-  const segs = status.segments, c = status.connection;
-  const current = c.connected && (c.phase === 'Running' || c.phase === 'Paused') ? c.index : -1;
+  const segs = status.segments, t = status.timer;
+  const current = t.phase === 'Running' || t.phase === 'Paused' ? t.index : -1;
   const key = JSON.stringify([segs, current, status.settings.mode, lang, !!catalog]);
   $('segEmpty').hidden = segs.length > 0;
   if (key === lastSegments) return;
@@ -169,7 +169,7 @@ function renderActions() {
 
 function render() {
   renderSettings();
-  renderConnection();
+  renderTimer();
   renderSession();
   renderRoute();
   renderSegments();
@@ -186,6 +186,30 @@ for (const e of document.querySelectorAll('[data-setting]')) {
     render();
   });
 }
+
+// Botones del cronómetro. Reiniciar pide confirmación (se pierde el intento).
+for (const b of $('timerButtons').querySelectorAll('button')) {
+  b.addEventListener('click', async () => {
+    let op = b.dataset.op;
+    if (op === 'pause' && status.timer.phase === 'Paused') op = 'resume';
+    if (op === 'reset') {
+      if (!resetTimerArmed) {
+        b.textContent = tr('timer.resetConfirm');
+        resetTimerArmed = setTimeout(() => { resetTimerArmed = null; b.textContent = tr('timer.reset'); }, 4000);
+        return;
+      }
+      clearTimeout(resetTimerArmed);
+      resetTimerArmed = null;
+      b.textContent = tr('timer.reset');
+    }
+    try { status = await post({ action: 'timer', op }); render(); } catch { /* se verá en el siguiente refresco */ }
+  });
+}
+$('timerCopy').addEventListener('click', async () => {
+  await navigator.clipboard.writeText(timerLink);
+  $('timerCopy').textContent = tr('timer.copied');
+  setTimeout(() => { $('timerCopy').textContent = tr('timer.copy'); }, 1500);
+});
 
 let resetArmed = null;
 $('sessionReset').addEventListener('click', async () => {
@@ -316,6 +340,10 @@ async function refresh() {
 (async () => {
   const s = await fetch('api/state').then(r => r.json());
   lang = s.lang;
+  // Fuente de OBS del cronómetro: la del servidor de OBS si está activo; con el perfil elegido para OBS.
+  const base = (s.obs && s.obs.url) || new URL('overlay.html', location.href).href;
+  const prof = s.config && s.config.obsProfile;
+  timerLink = base + '?part=timer' + (prof && prof !== 'main' ? '&profile=' + encodeURIComponent(prof) : '');
   document.documentElement.lang = lang;
   applyTexts();
   status = await fetch('api/livesplit').then(r => r.json());

@@ -72,6 +72,22 @@ const PROFILE = PARAMS.get('profile');
 const RACE = PARAMS.get('race');
 const QUERY = RACE ? '?race=' + encodeURIComponent(RACE) : PROFILE ? '?profile=' + encodeURIComponent(PROFILE) : '';
 const STATE_URL = 'api/state' + QUERY;
+// Fuente aparte (?part= en la dirección), con el mismo perfil y tema: tracker (todo menos los logros), achievements
+// (solo los logros y el progreso) o timer (el cronómetro con splits de la edición avanzada). Sin ?part=, todo junto.
+const PART = ['tracker', 'achievements', 'timer'].includes(PARAMS.get('part')) ? PARAMS.get('part') : null;
+const WITH_PROGRESS = PART !== 'tracker';
+const WITH_RUN = PART !== 'achievements';
+if (PART) document.body.dataset.part = PART;
+// El cronómetro solo existe en la edición avanzada: su vista va aparte y solo se carga aquí.
+if (PART === 'timer') {
+  const css = document.createElement('link');
+  css.rel = 'stylesheet';
+  css.href = 'timer-view.css';
+  document.head.append(css);
+  const js = document.createElement('script');
+  js.src = 'timer-view.js';
+  document.head.append(js);
+}
 const view = document.getElementById('view');
 const hero = document.getElementById('hero');
 let names = { goals: {}, watched: {} };
@@ -177,61 +193,51 @@ const progressStyle = o => (o.progressStyle === 'both' ? progressMode : o.progre
 // Un guardado al 100% no tiene nada pendiente: no se muestra su progreso.
 // Todo lo que devuelve lleva la clase «prog»: es lo único que se desvanece al alternar iconos y texto.
 function progressBlocks(s) {
-  const [meters, tags] = progressContent(s);
-  for (const node of [meters, tags, ...meters.children]) node.classList.add('prog');
-  return [meters, tags];
+  const blocks = progressContent(s);
+  for (const node of [...blocks, ...blocks[0].children]) node.classList.add('prog');
+  return blocks;
 }
 
+// Devuelve [barras, etiquetas de texto, iconos]. Cada total, contador o logro vigilado va como barra/texto o como icono
+// según el estilo: todo iconos, todo texto, alternando (both) o elegido uno a uno (mixed, con la lista asBars).
+// Iconos como el Deadgod Tracker: totales y contadores con su cifra al lado; los logros vigilados, solo el icono.
 function progressContent(s) {
   const p = s.progress;
   const meters = el('div', 'meters'), tags = el('div', 'tags');
-  if (!p || p.complete) return [meters, tags];
   const { show, goals, watched, options } = s.config;
-  if (progressStyle(options) === 'icons') return [meters, iconGrid(p, show, goals, watched, options)];
-  const add = (on, label, x) => { if (on && !(options.hideDone && x.done >= x.total)) meters.append(meter(label, x.done, x.total)); };
-  add(show.achievements, tr('view.achievements'), p.achievements);
-  add(show.collection, tr('view.items'), p.items);
-  add(show.marksHard, tr('view.marksHard'), p.marksHard);
-  add(show.marksAny, tr('view.marks'), p.marksAny);
-  add(show.challenges, tr('view.challenges'), p.challenges);
-  for (const g of p.goals) {
-    if (!goals.includes(g.id) || (options.hideDone && g.done)) continue;
-    const name = names.goals[g.id] || g.id;
-    if (g.done) tags.append(tag(name, true));
-    else meters.append(meter(name, g.value, g.goal));
-  }
-  for (const w of p.watched) {
-    if (watched.includes(w.id) && !(options.hideDone && w.done)) tags.append(tag(names.watched[w.id] || w.id, w.done));
-  }
-  return [meters, tags];
-}
-
-// Como el Deadgod Tracker: totales y contadores con su cifra al lado; los logros vigilados, solo el icono.
-function iconGrid(p, show, goals, watched, options) {
   const grid = el('div', 'achs' + (options.pendingLook === 'gray' ? ' gray' : ''));
-  const total = (on, key, label, x) => {
+  if (!p || p.complete) return [meters, tags, grid];
+  const style = progressStyle(options), bars = s.config.asBars || [];
+  const asIcon = id => (style === 'mixed' ? !bars.includes(id) : style === 'icons');
+  const total = (on, key, iconKey, label, x) => {
     const done = x.done >= x.total;
     if (!on || (options.hideDone && done)) return;
+    if (!asIcon(key)) { meters.append(meter(label, x.done, x.total)); return; }
     const value = `${x.done}/${x.total}`;
-    grid.append(achTile(TOTAL_ICONS[key], `${label} ${value}`, done, value, () => meter(label, x.done, x.total)));
+    grid.append(achTile(TOTAL_ICONS[iconKey], `${label} ${value}`, done, value, () => meter(label, x.done, x.total)));
   };
-  total(show.achievements, 'achievements', tr('view.achievements'), p.achievements);
-  total(show.collection, 'items', tr('view.items'), p.items);
-  total(show.marksHard, 'marksHard', tr('view.marksHard'), p.marksHard);
-  total(show.marksAny, 'marksAny', tr('view.marks'), p.marksAny);
-  total(show.challenges, 'challenges', tr('view.challenges'), p.challenges);
+  total(show.achievements, 'achievements', 'achievements', tr('view.achievements'), p.achievements);
+  total(show.collection, 'collection', 'items', tr('view.items'), p.items);
+  total(show.marksHard, 'marksHard', 'marksHard', tr('view.marksHard'), p.marksHard);
+  total(show.marksAny, 'marksAny', 'marksAny', tr('view.marks'), p.marksAny);
+  total(show.challenges, 'challenges', 'challenges', tr('view.challenges'), p.challenges);
   for (const g of p.goals) {
     if (!goals.includes(g.id) || (options.hideDone && g.done)) continue;
     const name = names.goals[g.id] || g.id;
+    if (!asIcon(g.id)) {
+      if (g.done) tags.append(tag(name, true)); else meters.append(meter(name, g.value, g.goal));
+      continue;
+    }
     const value = g.done ? '' : `${g.value}/${g.goal}`;
     grid.append(achTile(achievementIcon(g.id), value ? `${name} ${value}` : name, g.done, value, () => (g.done ? tag(name, true) : meter(name, g.value, g.goal))));
   }
   for (const w of p.watched) {
     if (!watched.includes(w.id) || (options.hideDone && w.done)) continue;
     const name = names.watched[w.id] || w.id;
-    grid.append(achTile(achievementIcon(w.id), name, w.done, '', () => tag(name, w.done)));
+    if (!asIcon(w.id)) tags.append(tag(name, w.done));
+    else grid.append(achTile(achievementIcon(w.id), name, w.done, '', () => tag(name, w.done)));
   }
-  return grid;
+  return [meters, tags, grid];
 }
 
 function transformBlock(s) {
@@ -262,16 +268,18 @@ function playersBlock(s) {
 
 function stripRow(s) {
   const row = el('div', 'strip');
-  row.append(...[whoBlock(s), playersBlock(s), ...progressBlocks(s), transformBlock(s)].filter(b => b.childNodes.length));
+  const progress = WITH_PROGRESS ? progressBlocks(s) : [];
+  const run = WITH_RUN ? [whoBlock(s), playersBlock(s)] : [];
+  row.append(...[...run, ...progress, ...(WITH_RUN ? [transformBlock(s)] : [])].filter(b => b.childNodes.length));
   return row;
 }
 
 function sideColumn(s) {
-  const side = el('div', 'side' + (progressStyle(s.config.options) === 'icons' ? ' icons' : ''));
-  const who = whoBlock(s);
-  const [meters, tags] = progressBlocks(s);
+  const side = el('div', 'side' + (progressStyle(s.config.options) !== 'text' ? ' icons' : ''));
+  const who = WITH_RUN ? whoBlock(s) : el('div');
+  const [meters, tags, grid] = WITH_PROGRESS ? progressBlocks(s) : [el('div'), el('div'), el('div')];
   const pages = el('div', 'pages');
-  pages.append(...[playersBlock(s)].filter(b => b.childNodes.length), ...meters.childNodes, ...[tags, transformBlock(s)].filter(b => b.childNodes.length));
+  pages.append(...(WITH_RUN ? [playersBlock(s)] : []).filter(b => b.childNodes.length), ...meters.childNodes, ...[tags, grid, ...(WITH_RUN ? [transformBlock(s)] : [])].filter(b => b.childNodes.length));
   side.append(...[who, pages].filter(b => b.childNodes.length));
   return side;
 }
@@ -615,6 +623,7 @@ function applyStyle(o) {
 function render(s) {
   const { show, options } = s.config;
   applyStyle(options);
+  if (PART === 'timer') { if (window.TimerView) TimerView.render(view, s); return; }
   document.body.classList.toggle('mark-latest', options.markItem === 'latest');
   document.body.classList.toggle('mark-hover', options.markItem === 'hover');
   document.body.classList.toggle('who-highlight', options.whoOutline !== 'none');
@@ -628,8 +637,8 @@ function render(s) {
   const banner = options.layout === 'banner';
   view.className = banner ? 'banner' : 'wide';
   const head = banner ? sideColumn(s) : stripRow(s);
-  const shelf = s.run && show.items ? [shelfRow(s)] : [];
-  const desc = s.run && show.description ? [descRow(s)] : [];
+  const shelf = WITH_RUN && s.run && show.items ? [shelfRow(s)] : [];
+  const desc = WITH_RUN && s.run && show.description ? [descRow(s)] : [];
   const parts = options.itemsPosition === 'above' ? [...shelf, head] : [head, ...shelf];
   const body = parts.filter(p => p.childNodes.length);
   if (banner) {
@@ -640,7 +649,7 @@ function render(s) {
     else if (desc.length) body.push(main);
     main.append(...desc.filter(p => p.childNodes.length));
   } else body.push(...desc.filter(p => p.childNodes.length));
-  if (!s.run) body.push(el('div', 'waiting', tr('view.waiting')));
+  if (!s.run && WITH_RUN) body.push(el('div', 'waiting', tr('view.waiting')));
   view.replaceChildren(...body);
   paginateSide(options.padding);
   fitShelf(options);
@@ -1088,7 +1097,9 @@ async function refresh() {
     try { await loadNames(); } catch { namesKey = null; }
   }
   render(current);
-  detectPickups(current);
+  // El objeto recién cogido se destaca solo donde se ven los objetos: no en la fuente de logros ni en un perfil
+  // que solo enseña logros (si no, con dos fuentes en OBS la animación sale dos veces).
+  if (WITH_RUN && PART !== 'timer' && current.config.show.items) detectPickups(current);
 }
 
 async function tick() {

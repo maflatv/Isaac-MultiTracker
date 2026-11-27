@@ -402,3 +402,23 @@ test('un activo glitcheado que se suelta en un pedestal sigue en el piso donde s
   write(...pick(-20, 'Mega'), L.remove(-20));
   assert.deepStrictEqual(live(), [-3, -19]);
 });
+
+test('la pausa del juego llega como evento si está el mod MultiTracker Pause', t => {
+  const s = setup(t);
+  const events = [];
+  const log = new RunLog(s.file, {}, () => false, () => false, () => {}, (type, d) => events.push([type, d]));
+  fs.appendFileSync(s.file, [L.seed(), L.player(0), '[INFO] - Lua Debug: MultiTracker: pause', '[INFO] - Lua Debug: MultiTracker: resume', '[INFO] - Lua Debug: MultiTracker: paused?'].join('\n') + '\n');
+  log.poll();
+  assert.deepStrictEqual(events.filter(e => e[0] === 'gamepause').map(e => e[1].paused), [true, false]);
+});
+
+test('enter: se entra en la partida con la primera sala tras la seed, no antes', t => {
+  const s = setup(t);
+  const events = [];
+  const log = new RunLog(s.file, {}, () => false, () => false, () => {}, (type) => { if (type === 'start' || type === 'enter') events.push(type); });
+  const write = (...lines) => { fs.appendFileSync(s.file, lines.join('\n') + '\n'); log.poll(); log.poll(); };
+  write(L.seed('AAAA BBBB', 'Continue'), L.player(0), L.level(1));
+  assert.deepStrictEqual(events, ['start'], 'cargando: aún no se ha entrado');
+  write(L.room('Start Room'), L.room('Other', '1.3'));
+  assert.deepStrictEqual(events, ['start', 'enter'], 'solo una vez por partida');
+});

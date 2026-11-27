@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<metadata>
+	<name>MultiTracker Pause</name>
+	<directory>multitracker pause</directory>
+	<description>Lets MultiTracker Avanzado pause its split timer while the game is paused. It only writes a line to log.txt when you pause or unpause.</description>
+	<version>1.0</version>
+	<visibility>Private</visibility>
+</metadata>

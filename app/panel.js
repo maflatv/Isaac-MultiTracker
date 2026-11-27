@@ -74,6 +74,9 @@ const api = path => path + (PROFILE !== MAIN ? '?profile=' + encodeURIComponent(
 const withProfile = (url, id) => url + (id && id !== MAIN ? '?profile=' + encodeURIComponent(id) : '');
 const $ = id => document.getElementById(id);
 const overlayUrl = new URL('overlay.html', location.href).href;
+// Vista que se ve en la vista previa y cuyo enlace de OBS sale debajo: '' (todo), 'tracker', 'achievements' o 'timer' (avanzada).
+let previewPart = '';
+const withPart = (url, part) => (part ? url + (url.includes('?') ? '&' : '?') + 'part=' + part : url);
 if (PROFILE !== MAIN) $('preview').src = withProfile('overlay.html', PROFILE);
 let config = null;
 let defaults = null;
@@ -90,15 +93,49 @@ function checkbox(parent, label, data, onChange) {
   const l = document.createElement('label'), c = document.createElement('input');
   c.type = 'checkbox';
   Object.assign(c.dataset, data);
-  c.addEventListener('change', () => onChange(c.checked));
+  c.addEventListener('change', () => { onChange(c.checked); syncLookButtons(); });
   l.append(c, ' ' + label);
+  // Con el estilo «Elegir para cada uno», los totales, contadores y logros marcados eligen barra o icono.
+  const lookId = data.list ? data.id : BAR_TOTALS.includes(data.show) ? data.show : null;
+  if (lookId) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'look-toggle';
+    b.dataset.look = lookId;
+    b.addEventListener('click', e => {
+      e.preventDefault();
+      toggleInList(config.asBars, lookId, !config.asBars.includes(lookId));
+      syncLookButtons();
+      hideToast();
+      save();
+    });
+    l.append(b);
+  }
   parent.append(l);
+}
+
+// Totales del progreso que pueden ir como barra o icono (como PROGRESS_TOTALS en tracker.js).
+const BAR_TOTALS = ['achievements', 'collection', 'marksHard', 'marksAny', 'challenges'];
+
+function syncLookButtons() {
+  if (!config) return;
+  if (!Array.isArray(config.asBars)) config.asBars = [];
+  const mixed = config.options.progressStyle === 'mixed';
+  for (const b of document.querySelectorAll('.look-toggle')) {
+    const box = b.parentElement.querySelector('input');
+    b.hidden = !mixed || !box.checked;
+    const bar = config.asBars.includes(b.dataset.look);
+    b.textContent = tr(bar ? 'progress.asBar' : 'progress.asIcon');
+    b.title = tr('progress.lookToggle');
+    b.classList.toggle('bar', bar);
+  }
 }
 
 function syncChecks() {
   for (const c of document.querySelectorAll('input[data-show]')) c.checked = !!config.show[c.dataset.show];
   for (const c of document.querySelectorAll('input[data-list]')) c.checked = config[c.dataset.list].includes(c.dataset.id);
   updateListCounts();
+  syncLookButtons();
 }
 
 function syncDependents() {
@@ -106,6 +143,7 @@ function syncDependents() {
     const on = DEPENDS[e.dataset.option];
     if (on) e.disabled = !on(config);
   }
+  syncLookButtons();
   $('testHighlight').disabled = !config.options.highlight;
   $('highlightNote').textContent = config.options.highlight ? tr('highlight.about.' + config.options.highlightStyle) : '';
 }
@@ -173,7 +211,8 @@ function applyConfig(next) {
 
 // En modo banner la vista previa tiene el tamaño real de la ventana.
 function syncPreviewSize() {
-  const banner = config.options.layout === 'banner', p = $('preview');
+  // El tamaño real de la ventana solo vale para la vista del tracker; los logros y los splits ocupan lo que necesitan.
+  const banner = config.options.layout === 'banner' && previewPart !== 'timer' && previewPart !== 'achievements', p = $('preview');
   p.classList.toggle('banner', banner);
   p.style.width = banner ? config.options.viewWidth + 'px' : '';
   p.style.height = banner ? config.options.viewHeight + 'px' : '';
@@ -320,7 +359,7 @@ function initOptions() {
 // ---------- Cambios en bloque: temas y «Restablecer», con «Deshacer» ----------
 let toastTimer = null;
 const TOAST_MS = 15000;
-const snapshot = () => JSON.parse(JSON.stringify({ show: config.show, goals: config.goals, watched: config.watched, options: config.options }));
+const snapshot = () => JSON.parse(JSON.stringify({ show: config.show, goals: config.goals, watched: config.watched, asBars: config.asBars || [], options: config.options }));
 
 // La imagen de fondo solo se cambia con sus botones: ni un tema ni deshacer la quitan o la recuperan.
 async function restore(state) {
@@ -499,7 +538,7 @@ function initProfiles() {
       config[key] = $(key).value;
       await save();
       fillProfileSelects();
-      $('link').textContent = obsLink();
+      $('link').textContent = currentLink();
     });
   }
 }
@@ -511,7 +550,7 @@ function exportSettings(scope) {
   if (scope === 'look') data.options = Object.fromEntries(Object.keys(appearance).map(k => [k, config.options[k]]));
   else {
     data.options = Object.fromEntries(Object.entries(config.options).filter(([k]) => !GLOBAL_OPTIONS.includes(k)));
-    Object.assign(data, { show: config.show, goals: config.goals, watched: config.watched, themes: config.themes.map(({ name, options }) => ({ name, options })) });
+    Object.assign(data, { show: config.show, goals: config.goals, watched: config.watched, asBars: config.asBars || [], themes: config.themes.map(({ name, options }) => ({ name, options })) });
   }
   const current = config.profileList.find(p => p.id === config.profile);
   const slug = fold(profileName(current || { id: MAIN })).replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'perfil';
@@ -543,7 +582,7 @@ async function importSettings(file) {
   await bulkChange(message, next => {
     Object.assign(next.options, options);
     if (data.show && typeof data.show === 'object') Object.assign(next.show, data.show);
-    for (const k of ['goals', 'watched']) if (Array.isArray(data[k])) next[k] = data[k].filter(x => typeof x === 'string');
+    for (const k of ['goals', 'watched', 'asBars']) if (Array.isArray(data[k])) next[k] = data[k].filter(x => typeof x === 'string');
   });
 }
 
@@ -806,12 +845,22 @@ function initObs() {
 
 // Enlace para la fuente de navegador de OBS, con el perfil elegido para OBS.
 const obsLink = () => withProfile(obsUrl, config.obsProfile);
+// Enlace de la pestaña elegida en la vista previa (la vista entera o una parte suelta con ?part=).
+const currentLink = () => withPart(obsLink(), previewPart);
+
+function selectPreview(part) {
+  previewPart = part;
+  for (const b of $('previewTabs').querySelectorAll('button')) b.setAttribute('aria-selected', String(b.dataset.part === part));
+  $('preview').src = withPart(withProfile('overlay.html', PROFILE), part);
+  syncPreviewSize();
+  $('link').textContent = currentLink();
+}
 
 function syncObs(obs) {
   if (!desktop) return;
   const running = !!(obs && obs.running);
   if (obs && obs.url) obsUrl = obs.url;
-  $('link').textContent = obsLink();
+  $('link').textContent = currentLink();
   $('linkRow').hidden = !running;
   $('obsProfileRow').hidden = !running;
   $('copyLink').hidden = !running;
@@ -913,6 +962,7 @@ async function init() {
   lang = state.lang;
   desktop = state.desktop;
   $('openLiveSplit').hidden = state.edition !== 'avanzada';
+  $('previewTabs').querySelector('[data-part="timer"]').hidden = state.edition !== 'avanzada';
   document.documentElement.lang = lang;
   I18N.apply(lang, document);
   // Para saber qué versión tiene abierta quien informa de un fallo. «dev» al ejecutar desde el código.
@@ -953,11 +1003,12 @@ async function init() {
   initFonts();
 
   $('testHighlight').addEventListener('click', () => $('preview').contentWindow.testHighlight());
-  $('link').textContent = obsLink();
+  $('link').textContent = currentLink();
   $('watchLink').addEventListener('click', () => copyButton($('watchLink'), withProfile(obsUrl, PROFILE), 'watch.copyLink'));
   $('raceCopy').addEventListener('click', () => copyButton($('raceCopy'), raceLink(), 'race.copyLink'));
+  for (const b of $('previewTabs').querySelectorAll('button')) b.addEventListener('click', () => selectPreview(b.dataset.part));
   $('copyLink').addEventListener('click', async () => {
-    await navigator.clipboard.writeText(obsLink());
+    await navigator.clipboard.writeText(currentLink());
     $('copyLink').textContent = tr('panel.linkCopied');
     setTimeout(() => { $('copyLink').textContent = tr('panel.copyLink'); }, 1500);
   });

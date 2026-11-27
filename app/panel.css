@@ -107,6 +107,7 @@ a.button.support:hover { background: var(--accent2); color: #1d1714; }
 .slider output { min-width: 24px; width: auto; }
 .note { color: var(--muted); font-size: 12px; margin: 6px 0 0; min-height: 1em; }
 .note.error { color: #ff9f9a; }
+.preview-tabs { position: static; margin: 0 0 8px; padding: 0; background: none; flex-wrap: wrap; }
 #previewPane { display: flex; flex-direction: column; padding: 10px; min-width: 0; }
 #preview { flex: 1; width: 100%; border: 1px solid var(--line); border-radius: 6px; background: repeating-conic-gradient(#3a2e27 0 25%, #43352d 0 50%) 0 0 / 16px 16px; color-scheme: normal; }
 #preview.banner { flex: none; width: 900px; height: 121px; box-sizing: content-box; max-width: 100%; }
@@ -128,3 +129,6 @@ dialog dt { margin-top: 10px; color: var(--muted); }
 dialog dd { margin: 2px 0 0; }
 dialog a { color: var(--accent2); }
 dialog form { display: flex; justify-content: flex-end; margin-top: 12px; }
+/* Barra o icono de cada total, contador o logro con el estilo «Elegir para cada uno». */
+.look-toggle { margin-left: auto; flex: none; font-size: 11px; padding: 0 6px; border-radius: 9px; border: 1px solid var(--muted); background: none; color: var(--muted); cursor: pointer; }
+.look-toggle.bar { border-color: currentColor; color: inherit; }

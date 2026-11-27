@@ -5,7 +5,7 @@
 // - MultiTracker.exe: portable, un solo archivo sin instalar nada. También va en el .zip, con las licencias a la vista.
 // En Linux (desde Windows, con WSL), en dist-linux/: MultiTracker-<versión>-x86_64.AppImage, que también se actualiza
 // solo, y su latest-linux.yml.
-// Uso: node build/build-exe.js 1.11.1. Los archivos de dist/ y dist-linux/ van en la release de esa versión en GitHub.
+// Uso: node build/build-exe.js 1.12.0. Los archivos de dist/ y dist-linux/ van en la release de esa versión en GitHub.
 // Solo incluye lo que Git publicaría: lo ignorado (userdata/, la fuente Upheaval...) nunca llega al programa.
 // Con --avanzada genera la edición avanzada (splits de LiveSplit) en dist-avanzada/: otro programa, con su propio
 // nombre, carpeta de ajustes e instalación, que no se publica ni se actualiza solo. La normal no lleva sus archivos.
@@ -15,13 +15,13 @@ const { execFileSync } = require('child_process');
 const { ROOT, WORK, ELECTRON, ELECTRON_UPDATER, installTools, installRuntime, run } = require('./tools.js');
 
 const VERSION = process.argv[2];
-if (!/^\d+\.\d+\.\d+$/.test(VERSION || '')) throw new Error('Indica la versión: node build/build-exe.js 1.11.1 [--avanzada]');
+if (!/^\d+\.\d+\.\d+$/.test(VERSION || '')) throw new Error('Indica la versión: node build/build-exe.js 1.12.0 [--avanzada]');
 const ADVANCED = process.argv.includes('--avanzada');
 const REPO = { owner: 'maflatv', repo: 'Isaac-MultiTracker' };
 const NAME = ADVANCED ? 'MultiTracker Avanzado' : 'MultiTracker';
 const FILE_NAME = ADVANCED ? 'MultiTracker-Avanzado' : 'MultiTracker';
 // Archivos que solo lleva la edición avanzada.
-const ADVANCED_FILES = ['lib/splitter.js', 'lib/splits.js', 'lib/livesplit.js', 'app/livesplit.html', 'app/livesplit.js', 'app/livesplit.css', 'app/livesplit-i18n.js'];
+const ADVANCED_FILES = ['lib/splitter.js', 'lib/splits.js', 'lib/timer.js', 'app/livesplit.html', 'app/livesplit.js', 'app/livesplit.css', 'app/livesplit-i18n.js', 'app/timer-view.js', 'app/timer-view.css'];
 
 const LINUX = process.platform === 'linux';
 if (!LINUX && process.platform !== 'win32') throw new Error('Solo se compila en Windows o en Linux (WSL).');

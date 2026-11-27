@@ -1,0 +1,32 @@
+/* Edición avanzada: fuente del cronómetro (overlay.html?part=timer). Letra, colores y fondo vienen del tema del perfil
+   (variables de overlay.css). Por delante del PB: el color de «conseguido»; por detrás, rojo; mejor segmento, dorado. */
+:root { --tv-ahead: var(--done, #4ade80); --tv-behind: #ef5350; --tv-gold: #f5c542; }
+#view.timer { display: block; }
+.tv { display: flex; flex-direction: column; gap: 4px; font-family: var(--font); font-size: calc(var(--size) * var(--tv-text, 1)); font-weight: var(--weight); color: var(--text); text-shadow: var(--text-shadow); }
+.tv-title { text-align: center; color: var(--accent); font-size: .85em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tv-rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.tv-row { display: grid; grid-template-columns: minmax(0, 1fr) auto 4.6em; gap: 0 .45em; align-items: baseline; padding: 1px 4px; border-radius: 3px; }
+/* Columna de tiempos antiguos (PB) entre la diferencia y el tiempo de este intento, con aire para no pegarse. */
+.tv-rows.with-pb .tv-row { grid-template-columns: minmax(0, 1fr) auto 4em 4.6em; }
+.tv-rows.with-pb .tv-time { margin-left: .5em; }
+.tv-old { font-variant-numeric: tabular-nums; font-size: .85em; text-align: right; opacity: .55; }
+.tv-row.gap { margin-top: 4px; border-top: 1px solid color-mix(in srgb, var(--text) 30%, transparent); padding-top: 4px; }
+.tv-row.current { background: color-mix(in srgb, var(--accent) 28%, transparent); }
+.tv-row.skipped .tv-name { opacity: .55; }
+.tv-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tv-delta { font-variant-numeric: tabular-nums; font-size: .85em; text-align: right; }
+.tv-time { font-variant-numeric: tabular-nums; text-align: right; }
+.tv-delta.ahead { color: var(--tv-ahead); }
+.tv-delta.behind { color: var(--tv-behind); }
+.tv-delta.gold { color: var(--tv-gold); }
+.tv-clock { text-align: right; font-size: calc(2.4em * var(--tv-clock, 1) / var(--tv-text, 1)); line-height: 1.1; font-variant-numeric: tabular-nums; color: var(--text); }
+.tv-clock small { font-size: .6em; }
+.tv-clock.ahead { color: var(--tv-ahead); }
+.tv-clock.behind { color: var(--tv-behind); }
+.tv-clock.paused, .tv-clock.idle { opacity: .6; }
+.tv-foot { display: flex; justify-content: space-between; gap: 1em; font-size: .8em; opacity: .85; }
+/* Tiempo del segmento actual, bajo el reloj y más pequeño (escala con el reloj). */
+.tv-seg { display: flex; justify-content: flex-end; align-items: baseline; gap: .4em; font-size: calc(1.2em * var(--tv-clock, 1) / var(--tv-text, 1)); font-variant-numeric: tabular-nums; margin-top: -2px; }
+.tv-seg small { font-size: .6em; margin-left: -.4em; }
+.tv-seg-label { font-size: .55em; opacity: .7; }
+.tv-seg.idle { opacity: .6; }

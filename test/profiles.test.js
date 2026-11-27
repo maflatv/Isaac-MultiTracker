@@ -53,3 +53,17 @@ test('con configuración guardada se añade a la lista sin tocar lo demás, y si
   open();
   assert.strictEqual(recommended(stored()).length, 0);
 });
+
+test('barra o icono uno a uno: asBars se guarda por perfil y solo con ids conocidos', async t => {
+  const { open, stored } = setup(t, { profiles: { pabc: { name: 'Logros', goals: ['c57'], options: {} } } });
+  const tr = open();
+  const post = async (body, profile) => JSON.parse((await tr.respond({ method: 'POST', pathname: '/api/config', contentType: 'application/json', query: new URLSearchParams(profile ? { profile } : {}), readJsonBody: async () => body })).body);
+  const cfg = tr.config('pabc');
+  cfg.options.progressStyle = 'mixed';
+  cfg.asBars = ['achievements', 'c57', 'basura'];
+  const saved = await post(cfg, 'pabc');
+  assert.strictEqual(saved.options.progressStyle, 'mixed');
+  assert.deepStrictEqual(saved.asBars, ['achievements', 'c57']);
+  assert.deepStrictEqual(stored().profiles.pabc.asBars, ['achievements', 'c57']);
+  assert.deepStrictEqual(tr.config().asBars, [], 'el principal no cambia');
+});
