@@ -238,6 +238,32 @@ test('pausa del juego: pausa y sigue con el juego; una pausa del botón no la qu
   } finally { t.done(); }
 });
 
+test('volver al menú pausa; continuar o empezar otra sigue; reiniciar con R no pausa', async () => {
+  for (const mode of ['route', 'floors']) {
+    const t = await setup({ mode, autoReset: false });
+    try {
+      if (mode === 'route') await t.api({ action: 'route', route: ROUTE });
+      t.ev('start', { mode: 'New', slot: 1, seed: 'S1', run: t.run });
+      t.clock.t += 1000;
+      t.ev('start', { mode: 'New', slot: 1, seed: 'S2', run: t.run });
+      assert.strictEqual(t.timer.phase, 'Running', `${mode}: reiniciar con R no pausa`);
+      t.clock.t += 1000;
+      t.ev('gamepause', { paused: true });
+      t.ev('menu', { run: t.run });
+      assert.strictEqual(t.timer.phase, 'Paused', `${mode}: en el menú está en pausa`);
+      t.clock.t += 60000;
+      t.ev('start', { mode: 'Continue', slot: 1, seed: 'S2', run: t.run });
+      assert.strictEqual(t.timer.phase, 'Running', `${mode}: continuar sigue`);
+      assert.strictEqual(t.timer.time(), 2, `${mode}: el menú no cuenta`);
+      t.ev('menu', { run: t.run });
+      t.clock.t += 60000;
+      t.ev('start', { mode: 'New', slot: 1, seed: 'S3', run: t.run });
+      assert.strictEqual(t.timer.phase, 'Running', `${mode}: una partida nueva sigue`);
+      assert.strictEqual(t.timer.time(), 2);
+    } finally { t.done(); }
+  }
+});
+
 test('una run terminada con los botones no suma su tiempo al intento siguiente', async () => {
   const t = await setup({ mode: 'route', enabled: false });
   try {
@@ -267,5 +293,110 @@ test('importar un .lss deduce las condiciones, trae los tiempos y pasa al modo d
     assert.strictEqual(exported.fileName, 'Mi ruta.lss');
     assert.match(exported.text, /<Name>Raro<\/Name>/);
     assert.match(exported.text, /<RealTime>00:00:40/);
+  } finally { t.done(); }
+});
+
+// ---------- Migración desde y hacia LiveSplit ----------
+const SAMPLE_LSS = fs.readFileSync(path.join(__dirname, 'fixtures', 'livesplit-completo.lss'), 'utf8');
+
+test('importar: primero la vista previa (qué trae y qué reemplaza); sin confirmar no cambia nada', async () => {
+  const t = await setup({ mode: 'route' });
+  try {
+    await t.api({ action: 'route', route: ROUTE });
+    const p = await t.api({ action: 'previewLss', fileName: 'Completo.lss', text: SAMPLE_LSS });
+    assert.strictEqual(p.method, 'GameTime');
+    assert.strictEqual(p.attemptCount, 7);
+    assert.strictEqual(p.history, 2);
+    assert.strictEqual(p.pb, 10200);
+    assert.deepStrictEqual(p.comparisons, ['Mi carrera & amigos']);
+    assert.strictEqual(p.icons, 1);
+    assert.strictEqual(p.autoSplitter, true);
+    assert.strictEqual(p.otherMethod, true);
+    assert.strictEqual(p.current.name, 'Prueba');
+    // Las subdivisiones de LiveSplit ("-" y "{Grupo}") no impiden entender el nombre.
+    assert.deepStrictEqual(p.segments.map(s => s.sure), [true, true]);
+    const st = await t.get('/api/livesplit');
+    assert.strictEqual(st.route.name, 'Prueba');
+    assert.strictEqual(st.canUndoImport, false);
+    const bad = await t.api({ action: 'importLss', token: 'otro' });
+    assert.strictEqual(bad.error, 'err.preview');
+  } finally { t.done(); }
+});
+
+test('importar y exportar: intentos, historial, otro método, iconos, comparaciones y ajustes vuelven tal cual', async () => {
+  const L = require('../lib/lss.js');
+  const t = await setup({ mode: 'route' });
+  try {
+    const p = await t.api({ action: 'previewLss', fileName: 'Completo.lss', text: SAMPLE_LSS });
+    const s = await t.api({ action: 'importLss', token: p.token });
+    assert.strictEqual(s.route.name, 'Completo');
+    assert.strictEqual(s.canUndoImport, true);
+    const view = await t.get('/api/timer');
+    assert.strictEqual(view.pb, 10200);
+    assert.strictEqual(view.attempts, 7);
+    const exported = await t.api({ action: 'exportLss' });
+    const back = L.parseLss(exported.text), orig = L.parseLss(SAMPLE_LSS);
+    // Todo igual que el original, más el bloque con las condiciones.
+    assert.ok(back.block && back.block.segments.length === 2);
+    back.block = null;
+    assert.deepStrictEqual(back, orig);
+  } finally { t.done(); }
+});
+
+test('cada intento queda en el historial (con su id) y se exporta; el PB nuevo deja sin PB el otro método', async () => {
+  const L = require('../lib/lss.js');
+  const t = await setup({ mode: 'route' });
+  try {
+    const p = await t.api({ action: 'previewLss', fileName: 'Completo.lss', text: SAMPLE_LSS });
+    await t.api({ action: 'importLss', token: p.token });
+    await t.api({ action: 'timer', op: 'start' });
+    assert.strictEqual((await t.get('/api/livesplit')).canUndoImport, false);
+    t.clock.t += 3000 * 1000; await t.api({ action: 'timer', op: 'split' });
+    t.clock.t += 4000 * 1000; await t.api({ action: 'timer', op: 'split' });
+    await t.api({ action: 'timer', op: 'reset' });
+    const run = L.parseLss((await t.api({ action: 'exportLss' })).text);
+    assert.strictEqual(run.attemptCount, 8);
+    const last = run.attempts[run.attempts.length - 1];
+    assert.strictEqual(last.id, 3);
+    assert.deepStrictEqual([last.r, last.g], [null, 7000]);
+    assert.deepStrictEqual(run.segments.map(s => s.history[s.history.length - 1]), [{ id: 3, r: null, g: 3000 }, { id: 3, r: null, g: 4000 }]);
+    // PB nuevo en Game Time: el Real Time del PB anterior ya no le corresponde.
+    assert.deepStrictEqual(run.segments.map(s => s.pb), [{ r: null, g: 3000 }, { r: null, g: 7000 }]);
+    // Los golds de Real Time siguen (son de intentos que pasaron).
+    assert.strictEqual(run.segments[0].best.r, 3480);
+    assert.strictEqual(run.segments[0].best.g, 3000);
+  } finally { t.done(); }
+});
+
+test('reimportar un .lss exportado desde aquí recupera las condiciones del bloque', async () => {
+  const t = await setup({ mode: 'route' });
+  try {
+    await t.api({ action: 'route', route: { ...ROUTE, segments: [{ name: 'Raro', conds: [{ t: 'challenge', id: 9 }], sure: true }] } });
+    const text = (await t.api({ action: 'exportLss' })).text;
+    const p = await t.api({ action: 'previewLss', fileName: 'Prueba.lss', text });
+    assert.strictEqual(p.fromBlock, true);
+    const s = await t.api({ action: 'importLss', token: p.token });
+    assert.deepStrictEqual(s.segments[0].conds, [{ t: 'challenge', id: 9 }]);
+  } finally { t.done(); }
+});
+
+test('importar hace copia de seguridad y se puede deshacer', async () => {
+  const t = await setup({ mode: 'route' });
+  try {
+    await t.api({ action: 'route', route: ROUTE });
+    await t.api({ action: 'timer', op: 'start' });
+    t.clock.t += 5000; await t.api({ action: 'timer', op: 'split' });
+    await t.api({ action: 'timer', op: 'pause' });
+    const p = await t.api({ action: 'previewLss', fileName: 'Completo.lss', text: SAMPLE_LSS });
+    assert.strictEqual(p.running, true);
+    await t.api({ action: 'importLss', token: p.token });
+    assert.strictEqual(fs.readdirSync(path.join(t.dir, 'backups')).length, 1);
+    const s = await t.api({ action: 'undoImport' });
+    assert.strictEqual(s.route.name, 'Prueba');
+    assert.strictEqual(s.canUndoImport, false);
+    // El intento en pausa vuelve como estaba.
+    assert.strictEqual(t.timer.phase, 'Paused');
+    assert.strictEqual(t.timer.splits.length, 1);
+    assert.strictEqual((await t.get('/api/timer')).pb, null);
   } finally { t.done(); }
 });

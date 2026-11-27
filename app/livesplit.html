@@ -70,6 +70,7 @@
       <div class="row-actions">
         <button type="button" id="importLss" data-i18n="route.import"></button>
         <button type="button" id="exportLss" data-i18n="route.export"></button>
+        <button type="button" id="undoImport" data-i18n="route.undoImport" hidden></button>
         <input type="file" id="lssFile" accept=".lss" hidden>
       </div>
       <p class="note" data-i18n="route.exportNote"></p>
@@ -86,6 +87,20 @@
     <ol id="segments" class="ls-segments"></ol>
   </section>
 </main>
+<dialog id="importDialog" class="ls-editor">
+  <h2 data-i18n="imp.title"></h2>
+  <p class="note" id="impFile"></p>
+  <h3 data-i18n="imp.brings"></h3>
+  <ul id="impBrings" class="ls-conds"></ul>
+  <p class="note" id="impManual"></p>
+  <h3 data-i18n="imp.replaces"></h3>
+  <ul id="impReplaces" class="ls-conds"></ul>
+  <p class="note" data-i18n="imp.backupNote"></p>
+  <div class="row-actions ls-editor-actions">
+    <button type="button" id="impConfirm" class="primary" data-i18n="imp.confirm"></button>
+    <button type="button" id="impCancel" data-i18n="imp.cancel"></button>
+  </div>
+</dialog>
 <dialog id="editor" class="ls-editor">
   <h2 id="editorTitle"></h2>
   <ul id="condList" class="ls-conds"></ul>

@@ -111,6 +111,7 @@ function renderRoute() {
   const review = status.settings.mode === 'route' ? status.segments.filter(s => !s.sure || !s.conds.length).length : 0;
   $('routeSummary').textContent = r ? tr('route.summary', { name: r.name || r.category || '—', count: status.settings.mode === 'route' ? status.segments.length : '…', review }) : tr('route.none');
   $('exportLss').disabled = !status.segments.length;
+  $('undoImport').hidden = !status.canUndoImport;
 }
 
 function renderSegments() {
@@ -233,7 +234,58 @@ $('lssFile').addEventListener('change', async () => {
   if (!f) return;
   $('routeError').textContent = '';
   try {
-    status = await post({ action: 'importLss', text: await f.text(), fileName: f.name });
+    showPreview(await post({ action: 'previewLss', text: await f.text(), fileName: f.name }), f.name);
+  } catch (e) { $('routeError').textContent = e.message; }
+});
+
+// Vista previa de la importación: qué trae el .lss, qué segmentos quedan a mano y qué se reemplaza.
+let previewToken = null;
+function showPreview(p, fileName) {
+  previewToken = p.token;
+  $('impFile').textContent = tr('imp.file', { file: fileName, game: p.game || '—', category: p.category || '—' });
+  const list = (id, items) => {
+    const ul = $(id);
+    ul.textContent = '';
+    for (const text of items) { const li = document.createElement('li'); li.textContent = text; ul.append(li); }
+  };
+  const manual = p.segments.filter(s => !s.sure || !s.conds).length;
+  const brings = [
+    tr('imp.segments', { count: p.segments.length }),
+    p.pb !== null ? tr('imp.pb', { time: fmt(p.pb), method: tr('imp.method.' + p.method) }) : tr('imp.noPb'),
+    tr('imp.golds', { count: p.golds }),
+    tr('imp.attempts', { count: p.attemptCount, history: p.history }),
+  ];
+  if (p.otherMethod) brings.push(tr('imp.otherMethod'));
+  if (p.comparisons.length) brings.push(tr('imp.comparisons', { names: p.comparisons.join(', ') }));
+  if (p.icons) brings.push(tr('imp.icons', { count: p.icons }));
+  if (p.autoSplitter) brings.push(tr('imp.autoSplitter'));
+  if (p.fromBlock) brings.push(tr('imp.fromBlock'));
+  list('impBrings', brings);
+  $('impManual').textContent = manual ? tr('imp.manual', { count: manual, names: p.segments.filter(s => !s.sure || !s.conds).slice(0, 5).map(s => s.name).join(', ') + (manual > 5 ? '…' : '') }) : tr('imp.allSure');
+  const replaces = [];
+  if (p.current.name !== null) replaces.push(tr('imp.currentRoute', { name: p.current.name || '—', count: p.current.segments }));
+  if (p.current.mode !== 'route') replaces.push(tr('imp.modeChange', { mode: tr('mode.' + p.current.mode) }));
+  if (p.replaces) replaces.push(tr('imp.sameName', { pb: p.replaces.pb !== null ? fmt(p.replaces.pb) : '—', attempts: p.replaces.attempts, history: p.replaces.history }));
+  if (p.running) replaces.push(tr('imp.running'));
+  if (!replaces.length) replaces.push(tr('imp.nothing'));
+  list('impReplaces', replaces);
+  $('importDialog').showModal();
+}
+$('impConfirm').addEventListener('click', async () => {
+  try {
+    status = await post({ action: 'importLss', token: previewToken });
+    render();
+  } catch (e) { $('routeError').textContent = e.message; }
+  previewToken = null;
+  $('importDialog').close();
+});
+$('impCancel').addEventListener('click', () => $('importDialog').close());
+// Cerrar con Esc o el botón: la importación pendiente se descarta.
+$('importDialog').addEventListener('close', () => { if (previewToken) post({ action: 'cancelImport' }).catch(() => {}); previewToken = null; });
+$('undoImport').addEventListener('click', async () => {
+  $('routeError').textContent = '';
+  try {
+    status = await post({ action: 'undoImport' });
     render();
   } catch (e) { $('routeError').textContent = e.message; }
 });
